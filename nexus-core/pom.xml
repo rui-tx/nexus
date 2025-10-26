@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>org.nexus</groupId>
+    <artifactId>nexus</artifactId>
+    <version>0.1-ALPHA</version>
+  </parent>
+
+  <artifactId>nexus-core</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.nexus</groupId>
+      <artifactId>nexus-api</artifactId>
+      <version>0.1-ALPHA</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.graalvm.buildtools</groupId>
+      <artifactId>native-maven-plugin</artifactId>
+      <version>0.11.2</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-all</artifactId>
+      <version>4.2.7.Final</version>
+    </dependency>
+
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.5.20</version>
+      <scope>compile</scope>
+    </dependency>
+  </dependencies>
+
+  <profiles>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>0.11.2</version>
+            <extensions>true</extensions>
+            <configuration>
+              <mainClass>org.nexus.Main</mainClass>
+              <imageName>nexus-${os.arch}</imageName>
+              <buildArgs>
+<!--                <buildArg>-Ob</buildArg>-->
+                <buildArg>--no-fallback</buildArg>
+                <buildArg>--initialize-at-build-time=org.slf4j,ch.qos.logback</buildArg>
+                <buildArg>-H:ReflectionConfigurationFiles=nexus-core/src/main/resources/META-INF/native-image/reflect-config.json</buildArg>
+                <buildArg>-H:ResourceConfigurationFiles=nexus-core/src/main/resources/META-INF/native-image/resource-config.json</buildArg>
+              </buildArgs>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+                <id>build-native</id>
+                <phase>package</phase>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>
