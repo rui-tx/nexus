@@ -1,0 +1,26 @@
+[
+  {
+    "name": "org.ruitx.SimpleHttpServerHandler",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true,
+    "methods": [
+      {
+        "name": "exceptionCaught",
+        "parameterTypes": [
+          "io.netty.channel.ChannelHandlerContext",
+          "java.lang.Throwable"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "io.netty.handler.codec.http.HttpServerCodec",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  },
+  {
+    "name": "io.netty.handler.codec.http.DefaultFullHttpResponse",
+    "allDeclaredConstructors": true,
+    "allPublicMethods": true
+  }
+]
