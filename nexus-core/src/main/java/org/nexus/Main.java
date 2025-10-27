@@ -9,6 +9,7 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,7 @@ public class Main {
             protected void initChannel(Channel ch) {
               ChannelPipeline pipeline = ch.pipeline();
               pipeline.addLast(new HttpServerCodec());
+              pipeline.addLast(new HttpObjectAggregator(65536)); // 64KB
               pipeline.addLast(new DefaultHttpServerHandler());
             }
           });

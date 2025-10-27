@@ -53,7 +53,11 @@
               <mainClass>org.nexus.Main</mainClass>
               <imageName>nexus-${os.arch}</imageName>
               <buildArgs>
-<!--                <buildArg>-Ob</buildArg>-->
+                <buildArg>-Ob</buildArg>
+                <buildArg>--no-fallback</buildArg>
+                <!-- <buildArg>&#45;&#45;pgo</buildArg>-->
+                <buildArg>--future-defaults=all</buildArg>
+                <buildArg>-march=native</buildArg>
                 <buildArg>--no-fallback</buildArg>
                 <buildArg>--initialize-at-build-time=org.slf4j,ch.qos.logback</buildArg>
                 <buildArg>-H:ReflectionConfigurationFiles=nexus-core/src/main/resources/META-INF/native-image/reflect-config.json</buildArg>

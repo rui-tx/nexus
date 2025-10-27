@@ -56,27 +56,32 @@ public class Response<T> {
   }
 
   public FullHttpResponse toHttpResponse() {
+    boolean isProblem = body instanceof ProblemDetails;
     boolean errorParsing = false;
     String parsed = "";
 
-    if (responseType == ResponseType.JSON) {
-      try {
+    try {
+      if (isProblem) {
+        parsed = mapper.writeValueAsString(body);
+      } else if (responseType == ResponseType.JSON) {
         ApiResponse wrapper = new ApiResponse(statusCode, body);
         parsed = mapper.writeValueAsString(wrapper);
-      } catch (JsonProcessingException e) {
-        LOGGER.error("Serialization failed", e);
-        errorParsing = true;
-        parsed = """
-            {"status":%d,"error":"Serialization failed"}
-            """.formatted(statusCode);
+      } else {
+        parsed = body != null ? body.toString() : "null";
       }
-    } else {
-      parsed = body != null ? body.toString() : "null";
+    } catch (JsonProcessingException e) {
+      LOGGER.error("Serialization failed", e);
+      errorParsing = true;
+      parsed = """
+          {"status":%d,"error":"Serialization failed"}
+          """.formatted(statusCode);
     }
 
-    String contentType = responseType == ResponseType.JSON
-        ? "application/json"
-        : "text/plain";
+    String contentType = isProblem
+        ? "application/problem+json"
+        : responseType == ResponseType.JSON
+            ? "application/json"
+            : "text/plain";
 
     DefaultFullHttpResponse response = new DefaultFullHttpResponse(
         HttpVersion.HTTP_1_1,
