@@ -58,7 +58,7 @@ public class Response<T> {
   public FullHttpResponse toHttpResponse() {
     boolean isProblem = body instanceof ProblemDetails;
     boolean errorParsing = false;
-    String parsed = "";
+    String parsed;
 
     try {
       if (isProblem) {
