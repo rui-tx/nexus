@@ -4,12 +4,23 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * RFC 9457 Problem Details for HTTP APIs.
  * <a href="https://www.rfc-editor.org/rfc/rfc9457">Link</a>
  */
 public sealed interface ProblemDetails permits ProblemDetails.Single, ProblemDetails.Multiple {
+
+  default int getStatus() {
+    return switch (this) {
+      case Single s -> Objects.requireNonNullElse(s.status(), 500);
+      case Multiple m -> m.problems().stream()
+          .mapToInt(s -> Objects.requireNonNullElse(s.status(), 500))
+          .findFirst()
+          .orElse(500);
+    };
+  }
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
   record Single(

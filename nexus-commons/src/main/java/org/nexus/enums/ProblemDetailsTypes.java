@@ -9,6 +9,10 @@ public final class ProblemDetailsTypes {
   public static final String PATH_PARAM_MISSING = BASE + "/path-param-missing";
   public static final String CLIENT_ERROR = BASE + "/client-error";
 
+  public static final String QUERY_PARAM_MISSING = BASE + "/query-param-missing";
+  public static final String QUERY_PARAM_INVALID_INTEGER = BASE + "/query-param-invalid-integer";
+  public static final String QUERY_PARAM_INVALID_LONG = BASE + "/query-param-invalid-long";
+
   private ProblemDetailsTypes() {
   }
 }

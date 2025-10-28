@@ -1,6 +1,6 @@
 [
   {
-    "name": "org.nexus.Api$TestDTO",
+    "name": "org.nexus.Api$ApiDTO",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -8,8 +8,6 @@
     "allDeclaredMethods": true,
     "allPublicMethods": true,
     "queryAllPublicMethods": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllPublicFields": true,
-    "queryAllDeclaredFields": true
+    "queryAllDeclaredMethods": true
   }
 ]

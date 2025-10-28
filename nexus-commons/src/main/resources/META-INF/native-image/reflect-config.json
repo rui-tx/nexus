@@ -8,9 +8,7 @@
     "allDeclaredMethods": true,
     "allPublicMethods": true,
     "queryAllPublicMethods": true,
-    "queryAllDeclaredMethods": true,
-    "queryAllPublicFields": true,
-    "queryAllDeclaredFields": true
+    "queryAllDeclaredMethods": true
   },
   {
     "name": "org.nexus.Response",

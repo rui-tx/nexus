@@ -1,7 +1,11 @@
 package org.nexus;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.nexus.annotations.Mapping;
+import org.nexus.annotations.QueryParam;
 import org.nexus.enums.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,13 +26,28 @@ public class Api {
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/path/:id/:name")
-  public Response<TestDTO> testPathParams(int id, String name) {
-    return new Response<>(200, new TestDTO(id, name));
+  public Response<ApiDTO> testParams(
+      int id,
+      String name,
+      @QueryParam("foo") List<Integer> foo,
+      @QueryParam("bar") String bar) {
+
+    Map<String, String> map = new LinkedHashMap<>();
+    if (foo != null) {
+      map.put("foo", foo.toString());
+    }
+
+    if (bar != null) {
+      map.put("bar", bar.toString());
+    }
+
+    return new Response<>(200, new ApiDTO(id, name, map));
   }
 
-  public record TestDTO(
+  public record ApiDTO(
       @JsonProperty("id") int id,
-      @JsonProperty("name") String name) {
+      @JsonProperty("name") String name,
+      @JsonProperty("query_params") Map<String, String> query) {
 
   }
 }
