@@ -1,0 +1,10 @@
+services:
+  nexus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus-server
+    ports:
+      - "15000:15000"
+    command: [ "-p", "15000" ]
+    restart: unless-stopped

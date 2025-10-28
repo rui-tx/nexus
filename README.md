@@ -45,7 +45,15 @@ mvn clean package -Pnative
 Run it
 
 ```
-./nexus-core/target/nexus-[arch] -Xmx512m -Xms128m
+./nexus-core/target/nexus-[arch]
+```
+
+## Docker
+
+Build and run
+
+```
+podman compose up --build
 ```
 
 ## Test it
