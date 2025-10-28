@@ -28,10 +28,47 @@ public class Main {
 
   // cli entry
   static void main(String[] args) throws Exception {
+    int port = 15000;
+
+    for (int i = 0; i < args.length; i++) {
+      switch (args[i]) {
+        case "--help":
+        case "-h":
+          printHelp();
+          System.exit(0);
+        case "--port":
+        case "-p":
+          if (i + 1 < args.length) {
+            port = Integer.parseInt(args[++i]);
+          } else {
+            System.err.println("Missing value for port");
+            printHelp();
+            System.exit(1);
+          }
+          break;
+        default:
+          System.err.printf("Unknown argument: %s%n", args[i]);
+          printHelp();
+          System.exit(1);
+      }
+    }
+
     Main app = new Main();
-    app.start(15000, null);
+    app.start(port, null);
     app.serverChannel.closeFuture().sync();
     app.stop();
+  }
+
+  private static void printHelp() {
+    String help = """
+        nexus - Netty-based web server
+        Usage: nexus [options]
+          -p, --port <port>     Server port
+          -h, --help            Prints this help
+        
+        For more information, read the documentation in the repository
+        """;
+    System.out.print(help);
   }
 
   public void start(int port, TestRouteRegistry testRoutes) throws InterruptedException {
