@@ -16,7 +16,6 @@ import io.netty.util.CharsetUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import nexus.generated.GeneratedRoutes;
 import org.nexus.ProblemDetails.Single;
 import org.nexus.annotations.RequestContext;
 import org.nexus.annotations.Route;
@@ -44,14 +43,14 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
       QueryStringDecoder qsd = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
       Map<String, List<String>> queryParams = qsd.parameters();
 
-      Response<?> result = new Response<>(500, "Internal Server Error");
+      Response<?> result;
 
       if (HttpMethod.GET.name().equals(method) || HttpMethod.POST.name().equals(method)) {
-        Route<?> route = GeneratedRoutes.getRoute(method, path);
+        Route<?> route = nexus.generated.GeneratedRoutes.getRoute(method, path);
         Map<String, String> pathParams = Map.of();
 
         if (route == null) {
-          for (Route<?> candidate : GeneratedRoutes.getRoutes(method)) {
+          for (Route<?> candidate : nexus.generated.GeneratedRoutes.getRoutes(method)) {
             PathMatcher.Result r = PathMatcher.match(candidate.getPath(), path);
             if (r.matches()) {
               route = candidate;
