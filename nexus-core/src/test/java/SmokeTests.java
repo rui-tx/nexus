@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,14 +31,16 @@ class SmokeTests {
   void setUp() throws Exception {
     // note: the tests CAN reach the GeneratedRoutes table, these routes just have priority
     var testRoutes = new TestRouteRegistry()
-        .get("/found", _ -> new Response<>(200, "found"))
-        .get("/throw", _ -> {
-          throw new RuntimeException("boom");
-        })
+        .get("/found", _ ->
+            CompletableFuture.completedFuture(new Response<>(200, "found")))
+        .get("/throw", _ ->
+            CompletableFuture.failedFuture(new RuntimeException("boom")))
         .get("/path/:foo/:bar", rc -> {
           int foo = Integer.parseInt(rc.pathParams().get("foo"));
           String bar = rc.pathParams().get("bar");
-          return new Response<>(200, new PathParamRequestTestDTO(foo, bar));
+          return CompletableFuture.completedFuture(
+              new Response<>(200, new PathParamRequestTestDTO(foo, bar))
+          );
         });
 
     server = new Main();
