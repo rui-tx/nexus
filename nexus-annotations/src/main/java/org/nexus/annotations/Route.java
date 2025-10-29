@@ -1,6 +1,7 @@
 package org.nexus.annotations;
 
 import io.netty.handler.codec.http.HttpMethod;
+import java.util.concurrent.CompletableFuture;
 import org.nexus.Response;
 
 public class Route<T> {
@@ -23,7 +24,11 @@ public class Route<T> {
     return path;
   }
 
-  public Response<T> handle(RequestContext rc) {
-    return handler.handle(rc);
+  public CompletableFuture<Response<T>> handle(RequestContext rc) {
+    try {
+      return handler.handle(rc);
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(e);
+    }
   }
 }

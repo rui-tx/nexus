@@ -1,13 +1,16 @@
 package org.nexus;
 
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpObject;
 import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.CharsetUtil;
 import java.util.List;
@@ -31,6 +34,8 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
   protected void channelRead0(ChannelHandlerContext ctx, HttpObject msg) {
     if (msg instanceof FullHttpRequest request) {
 
+      boolean keepAlive = HttpUtil.isKeepAlive(request);
+
       String method = request.method().name();
       String rawUri = request.uri();
       String path = rawUri.split("\\?")[0];           // strip query string
@@ -39,7 +44,7 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
       QueryStringDecoder qsd = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
       Map<String, List<String>> queryParams = qsd.parameters();
 
-      Response<?> result;
+      Response<?> result = new Response<>(500, "Internal Server Error");
 
       if (HttpMethod.GET.name().equals(method) || HttpMethod.POST.name().equals(method)) {
         Route<?> route = GeneratedRoutes.getRoute(method, path);
@@ -57,43 +62,57 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
         }
 
         if (route == null) {
-          result = new Response<>(HttpResponseStatus.NOT_FOUND.code(), "Not Found");
+          FullHttpResponse notFound =
+              new Response<>(404, "Not Found").toHttpResponse();
+          HttpUtil.setContentLength(notFound, notFound.content().readableBytes());
+          ctx.writeAndFlush(notFound)
+              .addListener(ChannelFutureListener.CLOSE);
         } else {
           RequestContext rc = new RequestContext(ctx, request, pathParams, queryParams);
-          try {
-            result = route.handle(rc);
-          } catch (ProblemDetailsException pde) {
-            result = new Response<>(pde.getProblemDetails().getStatus(), pde.getProblemDetails());
-          } catch (Throwable t) {
-            LOGGER.error("Unexpected exception during route handling", t);
-            ProblemDetails error =
-                new ProblemDetails.Single(
-                    org.nexus.enums.ProblemDetailsTypes.SERVER_ERROR,
-                    "Internal Server Error",
-                    500,
-                    "An unexpected error occurred",
-                    "unknown",
-                    Map.of(
-                        "exception",
-                        Objects.toString(t.getMessage(), t.getClass().getSimpleName()))
-                );
-            result = new Response<>(HttpResponseStatus.INTERNAL_SERVER_ERROR.code(), error);
-          }
+
+          route.handle(rc).whenComplete((response, error) -> {
+            try {
+              if (error != null) {
+                handleError(ctx, error, keepAlive);
+              } else {
+                FullHttpResponse httpResponse = response.toHttpResponse();
+                if (keepAlive) {
+                  httpResponse.headers()
+                      .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                  httpResponse.headers().set(HttpHeaderNames.KEEP_ALIVE, "timeout=5");
+                }
+                HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
+
+                ChannelFuture future = ctx.writeAndFlush(httpResponse);
+                if (!keepAlive) {
+                  future.addListener(ChannelFutureListener.CLOSE);
+                }
+              }
+            } catch (Exception e) {
+              handleError(ctx, e, keepAlive);
+            }
+
+            // No need to release the request.
+            // SimpleChannelInboundHandler automatically does it for us
+            //request.release();
+          });
         }
       } else {
         result = new Response<>(
             HttpResponseStatus.METHOD_NOT_ALLOWED.code(),
             "Method Not Allowed");
-      }
 
-      request.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-      ctx.writeAndFlush(result.toHttpResponse())
-          .addListener(ChannelFutureListener.CLOSE)
-          .addListener(future -> {
-            if (!future.isSuccess()) {
-              LOGGER.error("Failed to send response: {}", future.cause().toString());
-            }
-          });
+        FullHttpResponse httpResponse = result.toHttpResponse();
+        if (keepAlive) {
+          httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+        }
+        HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
+
+        ChannelFuture future = ctx.writeAndFlush(httpResponse);
+        if (!keepAlive) {
+          future.addListener(ChannelFutureListener.CLOSE);
+        }
+      }
     }
   }
 
@@ -119,5 +138,26 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     Response<ProblemDetails> response = new Response<>(error.getStatus(), error);
     ctx.writeAndFlush(response.toHttpResponse())
         .addListener(ChannelFutureListener.CLOSE);
+  }
+
+  private void handleError(ChannelHandlerContext ctx, Throwable error, boolean keepAlive) {
+    Response<?> errorResponse;
+    if (error instanceof ProblemDetailsException pde) {
+      errorResponse = new Response<>(pde.getProblemDetails().getStatus(), pde.getProblemDetails());
+    } else {
+      LOGGER.error("Unexpected error", error);
+      errorResponse = new Response<>(500, "Internal Server Error");
+    }
+
+    FullHttpResponse httpResponse = errorResponse.toHttpResponse();
+    if (keepAlive) {
+      httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+    }
+    HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
+
+    ChannelFuture future = ctx.writeAndFlush(httpResponse);
+    if (!keepAlive) {
+      future.addListener(ChannelFutureListener.CLOSE);
+    }
   }
 }

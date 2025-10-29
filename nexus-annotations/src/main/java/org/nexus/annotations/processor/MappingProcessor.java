@@ -130,15 +130,18 @@ public class MappingProcessor extends AbstractProcessor {
     builder.append("""
         package %s;
         
+        import java.util.concurrent.ExecutionException;
         import org.nexus.annotations.Route;
         import org.nexus.ProblemDetails;
         import org.nexus.enums.ProblemDetailsTypes;
+        import org.nexus.exceptions.ProblemDetailsException;
         import org.nexus.exceptions.ProblemDetailsException;
         import io.netty.channel.ChannelHandlerContext;
         import io.netty.handler.codec.http.HttpRequest;
         import io.netty.handler.codec.http.HttpMethod;
         import java.util.*;
         import java.util.stream.Collectors;
+        import java.util.concurrent.CompletableFuture;
         
         public final class %s {
           private static final Map<String, Route<?>> routeMap = new HashMap<>();
@@ -254,11 +257,18 @@ public class MappingProcessor extends AbstractProcessor {
       String routeKey = "\"" + mapping.type().name() + " " + endpoint + "\"";
 
       // Extract Response<T> generic type
-      String responseGenericType = getResponseGenericType(method);
-      if (responseGenericType == null) {
-        messager.printMessage(Kind.ERROR, "Failed to extract Response<T> type", method);
+//      String responseGenericType = getResponseGenericType(method);
+//      if (responseGenericType == null) {
+//        messager.printMessage(Kind.ERROR, "Failed to extract Response<T> type", method);
+//        return false;
+//      }
+
+      ReturnInfo ri = analyzeReturnType(method, processingEnv);
+      if (ri == null) {
         return false;
       }
+      String responseGenericType = ri.genericType;
+      boolean needsWrap = ri.needsWrap;
 
       // Generate parameter extraction plus conversion
       List<String> placeholders = extractPlaceholders(endpoint);
@@ -442,21 +452,54 @@ public class MappingProcessor extends AbstractProcessor {
         }
       }
 
+      String returnStmt;
+      String invoke = "controller.%s(%s)".formatted(methodName, invokeArgs);
+      if (method.getReturnType().toString().startsWith("java.util.concurrent.CompletableFuture<")) {
+        // Already returns CompletableFuture, just return it
+        returnStmt = "return %s;".formatted(invoke);
+      } else {
+        // Wrap sync response in completed future
+        returnStmt = "return CompletableFuture.completedFuture(%s);".formatted(invoke);
+      }
+
       builder.append("""
-              routeMap.put(
-                %s,
-                new Route<%s>(%s, "%s", rc -> {
+            routeMap.put(
+              %s,
+              new Route<%s>(%s, "%s", rc -> {
+                %s
+                %s controller = new %s();
+                try {
                   %s
-                  %s controller = new %s();
-                  return controller.%s(%s);
-                }));
+                } catch (Exception e) {
+                  return CompletableFuture.failedFuture(e);
+                }
+              }));
           """.formatted(
           routeKey,
-          responseGenericType, httpMethod, endpoint,
-          paramCode.toString().trim(),
-          className, className,
-          methodName, invokeArgs
+          responseGenericType,
+          httpMethod,
+          endpoint,
+          paramCode.toString().trim().isEmpty() ? "" : paramCode + "\n      ",
+          className,
+          className,
+          returnStmt
       ));
+//
+//      builder.append("""
+//              routeMap.put(
+//                %s,
+//                new Route<%s>(%s, "%s", rc -> {
+//                  %s
+//                  %s controller = new %s();
+//                  return controller.%s(%s);
+//                }));
+//          """.formatted(
+//          routeKey,
+//          responseGenericType, httpMethod, endpoint,
+//          paramCode.toString().trim(),
+//          className, className,
+//          methodName, invokeArgs
+//      ));
     }
 
     builder.append("""
@@ -531,6 +574,49 @@ public class MappingProcessor extends AbstractProcessor {
 
     TypeMirror tArg = typeArgs.getFirst();
     return tArg.toString(); // e.g. "java.lang.Integer"
+  }
+
+  private ReturnInfo analyzeReturnType(ExecutableElement method, ProcessingEnvironment env) {
+    TypeMirror rt = method.getReturnType();
+    String rtStr = rt.toString();
+
+    // Must be CompletableFuture<Response<T>>
+    if (!rtStr.startsWith("java.util.concurrent.CompletableFuture<")) {
+      error(method, "Return type must be `CompletableFuture<Response<T>>`");
+      return null;
+    }
+
+    // Extract T from CompletableFuture<Response<T>>
+    DeclaredType cfDt = (DeclaredType) rt;
+    List<? extends TypeMirror> cfArgs = cfDt.getTypeArguments();
+    if (cfArgs.isEmpty() || !cfArgs.getFirst().toString().startsWith("org.nexus.Response<")) {
+      error(method, "CompletableFuture must wrap `Response<T>`");
+      return null;
+    }
+
+    String genericT = getFirstTypeArg((DeclaredType) cfArgs.getFirst());
+    return new ReturnInfo(genericT,
+        false); // No need for wrapping with CompletableFuture.supplyAsync
+  }
+
+  private String getFirstTypeArg(DeclaredType dt) {
+    return dt.getTypeArguments().isEmpty() ? "java.lang.Object"
+        : dt.getTypeArguments().getFirst().toString();
+  }
+
+  private void error(Element e, String msg, Object... args) {
+    messager.printMessage(Kind.ERROR, String.format(msg, args), e);
+  }
+
+  private static class ReturnInfo {
+
+    final String genericType;
+    final boolean needsWrap;  // true = @Async + Response<T> → auto supplyAsync
+
+    ReturnInfo(String genericType, boolean needsWrap) {
+      this.genericType = genericType;
+      this.needsWrap = needsWrap;
+    }
   }
 
 }

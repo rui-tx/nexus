@@ -72,12 +72,17 @@ public class Main {
   }
 
   public void start(int port, TestRouteRegistry testRoutes) throws InterruptedException {
-    EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
-    EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(NioIoHandler.newFactory());
+    EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+    EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
         .channel(NioServerSocketChannel.class)
+        .option(ChannelOption.SO_BACKLOG, 1024)
+        .option(ChannelOption.SO_REUSEADDR, true)
+        .childOption(ChannelOption.TCP_NODELAY, true)
+        .childOption(ChannelOption.SO_KEEPALIVE, true)
+        .childOption(ChannelOption.SO_REUSEADDR, true)
         .childHandler(new ChannelInitializer<>() {
           @Override
           protected void initChannel(Channel ch) {
