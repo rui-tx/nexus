@@ -10,6 +10,7 @@ Netty-based web server
 
 # Features
 
+- Async by default (and for now)
 - Route table generated at build time
 
 # Usage
