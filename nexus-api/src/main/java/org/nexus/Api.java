@@ -6,6 +6,7 @@ import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.nexus.annotations.Mapping;
+import org.nexus.annotations.Secured;
 import org.nexus.enums.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +16,7 @@ public class Api {
   private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
   private static final String ENDPOINT = "/api/v1";
 
+  @Secured(value = "USER", permissions = "R")
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
   public CompletableFuture<Response<String>> pong() {
     CompletableFuture<Response<String>> future = new CompletableFuture<>();
@@ -22,6 +24,7 @@ public class Api {
     return future;
   }
 
+  @Secured(permitAll = true)
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/sleep/:duration")
   public CompletableFuture<Response<String>> sleep(int duration) {
     long startTime = System.currentTimeMillis();

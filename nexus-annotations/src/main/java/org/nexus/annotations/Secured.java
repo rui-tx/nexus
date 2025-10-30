@@ -1,0 +1,17 @@
+package org.nexus.annotations;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Retention(RetentionPolicy.RUNTIME)
+public @interface Secured {
+
+  String[] value() default {};
+  
+  String[] permissions() default {};
+
+  boolean permitAll() default false;
+}
