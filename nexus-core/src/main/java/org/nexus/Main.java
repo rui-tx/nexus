@@ -15,6 +15,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
+import org.nexus.middleware.impl.AuthMiddleware;
+import org.nexus.middleware.impl.CorsMiddleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -75,6 +77,11 @@ public class Main {
     EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
     EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
+    DefaultHttpServerHandler defaultHttpServerHandler = DefaultHttpServerHandler.builder()
+        .addMiddleware(new CorsMiddleware())
+        .addMiddleware(new AuthMiddleware("test"))
+        .build();
+
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
         .channel(NioServerSocketChannel.class)
@@ -94,7 +101,7 @@ public class Main {
               pipeline.addLast(new TestRouterHandler(testRoutes));
             }
 
-            pipeline.addLast(new DefaultHttpServerHandler());
+            pipeline.addLast(defaultHttpServerHandler);
           }
         })
         .childOption(ChannelOption.SO_KEEPALIVE, true);

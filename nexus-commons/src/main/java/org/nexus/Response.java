@@ -12,6 +12,8 @@ import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.CharsetUtil;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.HashMap;
+import java.util.Map;
 import org.nexus.enums.ResponseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +26,7 @@ public class Response<T> {
 
   private final int statusCode;
   private final T body;
-
+  private final Map<String, String> headers = new HashMap<>();
   private ResponseType responseType = ResponseType.JSON;
 
   public Response(int statusCode) {
@@ -53,6 +55,27 @@ public class Response<T> {
 
   public ResponseType getResponseType() {
     return responseType;
+  }
+
+  /**
+   * Adds a header to the response.
+   *
+   * @param name The name of the header
+   * @param value The value of the header
+   * @return This response instance for method chaining
+   */
+  public Response<T> addHeader(String name, String value) {
+    headers.put(name, value);
+    return this;
+  }
+
+  /**
+   * Gets all headers that have been added to this response.
+   *
+   * @return An unmodifiable map of headers
+   */
+  public Map<String, String> getHeaders() {
+    return Map.copyOf(headers);
   }
 
   public FullHttpResponse toHttpResponse() {
@@ -89,8 +112,14 @@ public class Response<T> {
         Unpooled.copiedBuffer(parsed, CharsetUtil.UTF_8)
     );
 
+    // Set content type and length
     response.headers().set(HttpHeaderNames.CONTENT_TYPE, contentType);
     response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
+    
+    // Add custom headers
+    headers.forEach((name, value) -> 
+        response.headers().set(name, value)
+    );
 
     return response;
   }
