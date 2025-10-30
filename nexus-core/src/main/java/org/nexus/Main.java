@@ -15,7 +15,6 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
-import org.nexus.middleware.impl.AuthMiddleware;
 import org.nexus.middleware.impl.CorsMiddleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,7 +78,7 @@ public class Main {
 
     DefaultHttpServerHandler defaultHttpServerHandler = DefaultHttpServerHandler.builder()
         .addMiddleware(new CorsMiddleware())
-        .addMiddleware(new AuthMiddleware("test"))
+        //.addMiddleware(new AuthMiddleware(new RoleValidator()))
         .build();
 
     ServerBootstrap bootstrap = new ServerBootstrap();

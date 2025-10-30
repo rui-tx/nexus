@@ -1,143 +1,141 @@
 package org.nexus.middleware.impl;
 
 import io.netty.handler.codec.http.HttpResponseStatus;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
-import org.nexus.ProblemDetails;
+import nexus.generated.SecurityConfig;
+import org.nexus.ProblemDetails.Single;
 import org.nexus.Response;
 import org.nexus.annotations.RequestContext;
 import org.nexus.enums.ProblemDetailsTypes;
-import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.middleware.Middleware;
 import org.nexus.middleware.NextHandler;
+import org.nexus.security.SecurityRule;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-/**
- * Middleware that handles authentication using Bearer tokens. Can be configured with a static token
- * or a custom token validator function.
- */
 public class AuthMiddleware implements Middleware {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(AuthMiddleware.class);
 
   private static final String AUTH_HEADER = "Authorization";
   private static final String BEARER_PREFIX = "Bearer ";
 
-  private final Function<String, CompletableFuture<Boolean>> tokenValidator;
-  private final String realm;
+  private final Function<String, CompletableFuture<UserPrincipal>> tokenValidator;
 
-  /**
-   * Creates a new AuthMiddleware with a static token.
-   *
-   * @param validToken The valid bearer token to accept
-   */
-  public AuthMiddleware(String validToken) {
-    this(validToken, "api");
-  }
-
-  /**
-   * Creates a new AuthMiddleware with a static token and custom realm.
-   *
-   * @param validToken The valid bearer token to accept
-   * @param realm      The authentication realm
-   */
-  public AuthMiddleware(String validToken, String realm) {
-    Objects.requireNonNull(validToken, "Valid token cannot be null");
-    this.realm = Objects.requireNonNull(realm, "Realm cannot be null");
-    this.tokenValidator = token -> CompletableFuture.completedFuture(validToken.equals(token));
-  }
-
-  /**
-   * Creates a new AuthMiddleware with a custom token validator function.
-   *
-   * @param tokenValidator A function that validates a token and returns a
-   *                       CompletableFuture<Boolean>
-   * @param realm          The authentication realm
-   */
-  public AuthMiddleware(Function<String, CompletableFuture<Boolean>> tokenValidator, String realm) {
-    this.tokenValidator = Objects.requireNonNull(tokenValidator, "Token validator cannot be null");
-    this.realm = Objects.requireNonNull(realm, "Realm cannot be null");
+  public AuthMiddleware(Function<String, CompletableFuture<UserPrincipal>> tokenValidator) {
+    this.tokenValidator = Objects.requireNonNull(tokenValidator, "tokenValidator cannot be null");
   }
 
   @Override
   public CompletableFuture<Response<?>> handle(RequestContext ctx, NextHandler next) {
-    // Skip auth for OPTIONS requests (CORS preflight)
-    if ("OPTIONS".equals(ctx.request().method().name())) {
-      return next.next();
-    }
+    try {
+      // Get the security rule for this request
+      SecurityRule rule = SecurityConfig.getRule(
+          ctx.request().method().name(),
+          ctx.request().uri()
+      );
 
-    CompletableFuture<Response<?>> future = new CompletableFuture<>();
-    String authHeader = ctx.request().headers().get(AUTH_HEADER);
+      // If no rule exists, deny by default
+//      if (rule == null) {
+//        return CompletableFuture.completedFuture(createForbiddenResponse());
+//      }
 
-    // Check for missing or malformed Authorization header
-    if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
-      future.completeExceptionally(createUnauthorizedException(
-          "Missing or invalid Authorization header",
-          "Bearer",
-          "The request requires authentication"
-      ));
-      return future;
-    }
+      LOGGER.info("init");
 
-    // Extract and validate the token
-    String token = authHeader.substring(BEARER_PREFIX.length()).trim();
-    if (token.isEmpty()) {
-      future.completeExceptionally(createUnauthorizedException(
-          "Missing token",
-          "Bearer",
-          "The access token is missing from the request"
-      ));
-      return future;
-    }
+      LOGGER.info(rule.toString());
 
-    // Validate the token asynchronously
-    tokenValidator.apply(token).whenComplete((isValid, throwable) -> {
-      if (throwable != null) {
-        future.completeExceptionally(throwable);
-      } else if (!isValid) {
-        future.completeExceptionally(createForbiddenException(
-            "Invalid or expired token",
-            "The provided token is not valid"
-        ));
-      } else {
-        // Token is valid, continue to the next middleware/handler
-        next.next().whenComplete((response, nextThrowable) -> {
-          if (nextThrowable != null) {
-            future.completeExceptionally(nextThrowable);
-          } else {
-            future.complete(response);
-          }
-        });
+      LOGGER.info("init2");
+
+      // If the endpoint is public, allow access
+      if (rule.permitAll()) {
+        LOGGER.info("permitted");
+        return next.next();
       }
-    });
 
-    return future;
+      // Check for Authorization header
+      String authHeader = ctx.request().headers().get(AUTH_HEADER);
+      if (authHeader == null || !authHeader.startsWith(BEARER_PREFIX)) {
+        LOGGER.info("Missing or invalid Authorization header");
+        return CompletableFuture.completedFuture(
+            createUnauthorizedResponse("Missing or invalid Authorization header"));
+      }
+
+      // Extract and validate the token
+      String token = authHeader.substring(BEARER_PREFIX.length()).trim();
+      if (token.isEmpty()) {
+        LOGGER.info("Missing token");
+
+        return CompletableFuture.completedFuture(createUnauthorizedResponse("Missing token"));
+      }
+
+      LOGGER.info("After extraction");
+
+      // Validate token and check permissions
+      return tokenValidator.apply(token)
+          .thenCompose(user -> {
+            if (user == null) {
+              LOGGER.info("Invalid or expired token");
+              return CompletableFuture.completedFuture(
+                  createUnauthorizedResponse("Invalid or expired token"));
+            }
+
+            // Check if the user has required roles and permissions
+            if (!rule.isPermitted(user.roles(), user.permissions())) {
+              LOGGER.info("not permitted");
+              return CompletableFuture.completedFuture(createForbiddenResponse());
+            }
+
+            LOGGER.info("After check, next middleware");
+
+            return next.next();
+          });
+
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(e);
+    }
   }
 
-  private ProblemDetailsException createUnauthorizedException(String detail, String scheme,
-      String description) {
-    return new ProblemDetailsException(
-        new ProblemDetails.Single(
-            ProblemDetailsTypes.CLIENT_ERROR,
+
+  private Response<?> createUnauthorizedResponse(String detail) {
+    return new Response<>(
+        HttpResponseStatus.UNAUTHORIZED.code(),
+        new Single(
+            ProblemDetailsTypes.SERVER_ERROR,
             "Unauthorized",
-            HttpResponseStatus.UNAUTHORIZED.code(),
+            401,
             detail,
-            null // Instance can be set by the global exception handler
-        )
+            "unknown",
+            Map.of())
     );
   }
 
-/*    .addHeader("WWW-Authenticate",
-      String.format("Bearer realm=\"%s\", error=\"invalid_token\", error_description=\"%s\"",
-      realm, description)*/
-
-  private ProblemDetailsException createForbiddenException(String detail, String description) {
-    return new ProblemDetailsException(
-        new ProblemDetails.Single(
-            ProblemDetailsTypes.CLIENT_ERROR,
+  private Response<?> createForbiddenResponse() {
+    return new Response<>(
+        HttpResponseStatus.FORBIDDEN.code(),
+        new Single(
+            ProblemDetailsTypes.SERVER_ERROR,
             "Forbidden",
-            HttpResponseStatus.FORBIDDEN.code(),
-            detail,
-            null // Instance can be set by the global exception handler
-        )
+            403,
+            "You are forbidden to perform this operation",
+            "unknown",
+            Map.of())
     );
+  }
+
+  /**
+   * Represents an authenticated user with roles and permissions.
+   */
+  public record UserPrincipal(String userId, Set<String> roles, Set<String> permissions) {
+
+    public UserPrincipal(String userId, Set<String> roles, Set<String> permissions) {
+      this.userId = Objects.requireNonNull(userId, "userId cannot be null");
+      this.roles = Set.copyOf(Objects.requireNonNull(roles, "roles cannot be null"));
+      this.permissions = Set.copyOf(
+          Objects.requireNonNull(permissions, "permissions cannot be null"));
+    }
   }
 }
