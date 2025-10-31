@@ -63,7 +63,7 @@ final class MappingParameterProcessor {
       String paramName, String typeName) {
     String elemType = MappingProcessorUtils.getListElementType(param.asType());
     String listType = "java.util.List<" + elemType + ">";
-    String listRaw = "rc.queryParams(\"" + qpName + "\")";
+    String listRaw = "rc.getQueryParams(\"" + qpName + "\")";
     String tmpVar = paramName + "Raw";
 
     paramCode.append("        ").append(listType).append(" ").append(paramName)
@@ -88,7 +88,7 @@ final class MappingParameterProcessor {
 
   private void processScalarQueryParam(QueryParam qp, String qpName,
       String paramName, String typeName) {
-    String raw = "rc.queryParam(\"" + qpName + "\")";
+    String raw = "rc.getQueryParam(\"" + qpName + "\")";
     String valueExpr = buildQueryParamValueExpression(qp, qpName, raw);
     String conversion = convertQueryParamValue(typeName, valueExpr, qpName);
 
@@ -127,7 +127,7 @@ final class MappingParameterProcessor {
     }
 
     String placeholder = placeholders.get(placeholderIndex++);
-    String rawValue = "rc.pathParams().get(\"" + placeholder + "\")";
+    String rawValue = "rc.getPathParams().get(\"" + placeholder + "\")";
     String conversion = convertPathParamValue(typeName, rawValue, placeholder);
 
     paramCode

@@ -1,4 +1,4 @@
-package org.nexus;
+package org.nexus.interfaces;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

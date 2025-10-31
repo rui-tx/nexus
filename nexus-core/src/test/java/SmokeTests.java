@@ -36,8 +36,8 @@ class SmokeTests {
         .get("/throw", _ ->
             CompletableFuture.failedFuture(new RuntimeException("boom")))
         .get("/path/:foo/:bar", rc -> {
-          int foo = Integer.parseInt(rc.pathParams().get("foo"));
-          String bar = rc.pathParams().get("bar");
+          int foo = Integer.parseInt(rc.getPathParams().get("foo"));
+          String bar = rc.getPathParams().get("bar");
           return CompletableFuture.completedFuture(
               new Response<>(200, new PathParamRequestTestDTO(foo, bar))
           );

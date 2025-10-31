@@ -10,13 +10,10 @@ public final class MappingProcessorConstants {
   public static final String GENERATED_CLASS_HEADER = """
       package %s;
       
-      import java.util.concurrent.ExecutionException;
-      import org.nexus.annotations.Route;
-      import org.nexus.ProblemDetails;
+      import org.nexus.Route;
+      import org.nexus.interfaces.ProblemDetails;
       import org.nexus.enums.ProblemDetailsTypes;
       import org.nexus.exceptions.ProblemDetailsException;
-      import io.netty.channel.ChannelHandlerContext;
-      import io.netty.handler.codec.http.HttpRequest;
       import io.netty.handler.codec.http.HttpMethod;
       import java.util.*;
       import java.util.stream.Collectors;

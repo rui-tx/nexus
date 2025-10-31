@@ -1,8 +1,8 @@
-package org.nexus.annotations;
+package org.nexus;
 
 import io.netty.handler.codec.http.HttpMethod;
 import java.util.concurrent.CompletableFuture;
-import org.nexus.Response;
+import org.nexus.interfaces.RouteHandler;
 
 public class Route<T> {
 

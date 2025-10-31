@@ -1,6 +1,6 @@
 package org.nexus.exceptions;
 
-import org.nexus.ProblemDetails;
+import org.nexus.interfaces.ProblemDetails;
 
 public class ProblemDetailsException extends RuntimeException {
 

@@ -13,6 +13,7 @@ import io.netty.util.CharsetUtil;
 import java.time.Instant;
 import java.time.ZoneId;
 import org.nexus.enums.ResponseType;
+import org.nexus.interfaces.ProblemDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
