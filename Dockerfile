@@ -13,7 +13,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/nexus-core/target/nexus-aarch64 /app/nexus
+COPY --from=builder /app/nexus-core/target/nexus-0.1-ALPHA-SNAPSHOT /app/nexus
 
 RUN chmod +x /app/nexus
 

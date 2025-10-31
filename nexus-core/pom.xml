@@ -7,42 +7,49 @@
   <parent>
     <groupId>org.nexus</groupId>
     <artifactId>nexus</artifactId>
-    <version>0.1-ALPHA</version>
+    <version>${revision}</version>
   </parent>
 
   <artifactId>nexus-core</artifactId>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.nexus</groupId>
+        <artifactId>nexus-bom</artifactId>
+        <version>${project.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
     <dependency>
       <groupId>org.nexus</groupId>
       <artifactId>nexus-api</artifactId>
-      <version>0.1-ALPHA</version>
-    </dependency>
-
-    <dependency>
-      <groupId>org.graalvm.buildtools</groupId>
-      <artifactId>native-maven-plugin</artifactId>
-      <version>0.11.2</version>
     </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>
-      <artifactId>netty-all</artifactId>
-      <version>4.2.7.Final</version>
+      <artifactId>netty-handler</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.netty</groupId>
+      <artifactId>netty-transport</artifactId>
     </dependency>
 
     <dependency>
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
-      <version>1.5.20</version>
       <scope>compile</scope>
     </dependency>
 
     <dependency>
-        <groupId>org.junit.jupiter</groupId>
-        <artifactId>junit-jupiter-api</artifactId>
-        <version>6.0.0</version>
-        <scope>test</scope>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 
@@ -58,26 +65,31 @@
             <extensions>true</extensions>
             <configuration>
               <mainClass>org.nexus.Main</mainClass>
-              <imageName>nexus-${os.arch}</imageName>
               <buildArgs>
+                <!-- default: -O2 fast build: -Ob compress: -Os -->
                 <buildArg>-Ob</buildArg>
-                <buildArg>--no-fallback</buildArg>
-                <!-- <buildArg>&#45;&#45;pgo</buildArg>-->
-                <buildArg>--future-defaults=all</buildArg>
                 <buildArg>-march=native</buildArg>
                 <buildArg>--no-fallback</buildArg>
+                <buildArg>--future-defaults=all</buildArg>
                 <buildArg>--initialize-at-build-time=org.slf4j,ch.qos.logback</buildArg>
-                <buildArg>-H:ReflectionConfigurationFiles=nexus-core/src/main/resources/META-INF/native-image/reflect-config.json</buildArg>
-                <buildArg>-H:ResourceConfigurationFiles=nexus-core/src/main/resources/META-INF/native-image/resource-config.json</buildArg>
+                <buildArg>--enable-sbom</buildArg>
+<!--                <buildArg>&#45;&#45;enable-sbom=export</buildArg>-->
+                <buildArg>--emit build-report</buildArg>
+                <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                <buildArg>-H:Path=${project.build.directory}/native</buildArg>
+                <buildArg>-H:Name=nexus-${revision}</buildArg>
+                <buildArg>-H:AdvancedObfuscation=</buildArg>
+                <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/reflect-config.json</buildArg>
+                <buildArg>-H:ResourceConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/resource-config.json</buildArg>
               </buildArgs>
             </configuration>
             <executions>
               <execution>
+                <phase>package</phase>
                 <goals>
                   <goal>compile-no-fork</goal>
                 </goals>
                 <id>build-native</id>
-                <phase>package</phase>
               </execution>
             </executions>
           </plugin>

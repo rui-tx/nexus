@@ -46,7 +46,7 @@ mvn clean package -Pnative
 Run it
 
 ```
-./nexus-core/target/nexus-[arch]
+./nexus-core/target/native/nexus-[version]
 ```
 
 ## Docker

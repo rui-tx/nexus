@@ -6,19 +6,45 @@
 
   <groupId>org.nexus</groupId>
   <artifactId>nexus</artifactId>
-  <version>0.1-ALPHA</version>
+  <version>${revision}</version>
   <packaging>pom</packaging>
 
+  <properties>
+    <revision>0.1-ALPHA-SNAPSHOT</revision>
+    <project.version>${revision}</project.version>
+    <maven.compiler.source>25</maven.compiler.source>
+    <maven.compiler.target>25</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
   <modules>
+    <module>nexus-bom</module>
     <module>nexus-commons</module>
     <module>nexus-annotations</module>
     <module>nexus-api</module>
     <module>nexus-core</module>
   </modules>
 
-  <properties>
-    <maven.compiler.source>25</maven.compiler.source>
-    <maven.compiler.target>25</maven.compiler.target>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-  </properties>
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.12.1</version>
+          <configuration>
+            <source>${maven.compiler.source}</source>
+            <target>${maven.compiler.target}</target>
+          </configuration>
+        </plugin>
+
+        <plugin>
+          <groupId>org.graalvm.buildtools</groupId>
+          <artifactId>native-maven-plugin</artifactId>
+          <version>0.11.2</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
 </project>
