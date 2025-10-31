@@ -50,7 +50,7 @@ class LoadTests {
     // note: the tests CAN reach the GeneratedRoutes table, these routes just have priority
     var testRoutes = new TestRouteRegistry()
         .get("/primes/:number", rc -> {
-          int number = Integer.parseInt(rc.pathParams().get("number"));
+          int number = Integer.parseInt(rc.getPathParams().get("number"));
           return primes(number);
         });
 

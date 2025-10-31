@@ -1,13 +1,9 @@
 package org.nexus;
 
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.FullHttpRequest;
+import org.nexus.annotations.RequestContext;
 
+@FunctionalInterface
 public interface Middleware {
-  default void handle(ChannelHandlerContext ctx, FullHttpRequest req) {
-  }
-
-  default Response process(ChannelHandlerContext ctx, FullHttpRequest req, Response response) {
-    return response;
-  }
+  
+  void handle(RequestContext ctx, MiddlewareChain next) throws Exception;
 }
