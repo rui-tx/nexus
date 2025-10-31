@@ -1,4 +1,4 @@
-package org.nexus.annotations;
+package org.nexus;
 
 import java.util.Set;
 

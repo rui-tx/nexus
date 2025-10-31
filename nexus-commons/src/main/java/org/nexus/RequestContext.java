@@ -1,4 +1,4 @@
-package org.nexus.annotations;
+package org.nexus;
 
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultHttpHeaders;

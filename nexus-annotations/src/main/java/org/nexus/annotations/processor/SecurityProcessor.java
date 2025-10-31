@@ -15,8 +15,8 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
+import org.nexus.SecurityRule;
 import org.nexus.annotations.Secured;
-import org.nexus.annotations.SecurityRule;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Secured")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
@@ -82,7 +82,7 @@ public class SecurityProcessor extends AbstractProcessor {
           package %s;
           
           import java.util.*;
-          import org.nexus.annotations.SecurityRule;
+          import org.nexus.SecurityRule;
           
           public final class %s {
             private static final Map<String, SecurityRule> RULES = new HashMap<>();

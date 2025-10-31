@@ -1,6 +1,7 @@
-package org.nexus.annotations;
+package org.nexus.interfaces;
 
 import java.util.concurrent.CompletableFuture;
+import org.nexus.RequestContext;
 import org.nexus.Response;
 
 @FunctionalInterface

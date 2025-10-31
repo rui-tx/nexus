@@ -3,7 +3,8 @@ package org.nexus;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
-import org.nexus.annotations.RequestContext;
+import org.nexus.interfaces.Middleware;
+import org.nexus.interfaces.MiddlewareChain;
 
 public class DefaultMiddlewareChain implements MiddlewareChain {
 

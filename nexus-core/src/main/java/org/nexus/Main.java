@@ -16,6 +16,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
+import org.nexus.interfaces.Middleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

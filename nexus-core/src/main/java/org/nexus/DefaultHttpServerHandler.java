@@ -17,11 +17,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import nexus.generated.GeneratedRoutes;
-import org.nexus.ProblemDetails.Single;
-import org.nexus.annotations.RequestContext;
-import org.nexus.annotations.Route;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
+import org.nexus.interfaces.Middleware;
+import org.nexus.interfaces.MiddlewareChain;
+import org.nexus.interfaces.ProblemDetails;
+import org.nexus.interfaces.ProblemDetails.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

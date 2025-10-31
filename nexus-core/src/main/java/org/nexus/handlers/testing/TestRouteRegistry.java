@@ -4,8 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
+import org.nexus.RequestContext;
 import org.nexus.Response;
-import org.nexus.annotations.RequestContext;
 import org.nexus.enums.HttpMethod;
 
 public final class TestRouteRegistry {

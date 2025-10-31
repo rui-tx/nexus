@@ -14,10 +14,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import org.nexus.PathMatcher;
-import org.nexus.ProblemDetails;
+import org.nexus.RequestContext;
 import org.nexus.Response;
-import org.nexus.annotations.RequestContext;
 import org.nexus.exceptions.ProblemDetailsException;
+import org.nexus.interfaces.ProblemDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
