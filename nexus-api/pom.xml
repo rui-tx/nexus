@@ -60,6 +60,8 @@
           </annotationProcessorPaths>
         </configuration>
       </plugin>
+
+      <!-- Add generated Java sources to compilation -->
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>build-helper-maven-plugin</artifactId>
@@ -78,6 +80,20 @@
             </configuration>
           </execution>
         </executions>
+      </plugin>
+
+      <!-- Ensure META-INF/native-image is included in the JAR -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <!-- This includes everything from target/classes by default -->
+          <!-- But we'll be explicit to ensure META-INF is included -->
+          <archive>
+            <addMavenDescriptor>true</addMavenDescriptor>
+          </archive>
+        </configuration>
       </plugin>
     </plugins>
   </build>

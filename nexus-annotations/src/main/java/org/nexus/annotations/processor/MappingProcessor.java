@@ -22,6 +22,7 @@ import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 import org.nexus.annotations.Mapping;
+import org.nexus.annotations.RequestBody;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Mapping")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
@@ -30,12 +31,14 @@ public class MappingProcessor extends AbstractProcessor {
   private Filer filer;
   private Messager messager;
   private boolean hasGenerated = false;
+  private ReflectionConfigGenerator reflectionConfigGenerator;
 
   @Override
   public synchronized void init(ProcessingEnvironment processingEnv) {
     super.init(processingEnv);
     this.filer = processingEnv.getFiler();
     this.messager = processingEnv.getMessager();
+    this.reflectionConfigGenerator = new ReflectionConfigGenerator(processingEnv);
   }
 
   @Override
@@ -55,6 +58,7 @@ public class MappingProcessor extends AbstractProcessor {
       return true;
     } catch (Exception e) {
       messager.printMessage(Kind.ERROR, "Failed to generate routes: " + e.getMessage());
+      e.printStackTrace();
       return false;
     }
   }
@@ -63,7 +67,7 @@ public class MappingProcessor extends AbstractProcessor {
     Map<String, String> routeKeys = new HashMap<>();
     List<RouteInfo> routes = new ArrayList<>();
 
-    // First pass: validate all methods and collect route information
+    // First pass: validate all methods and collect route information + reflection types
     for (Element element : elements) {
       if (element.getKind() != ElementKind.METHOD) {
         messager.printMessage(
@@ -93,11 +97,34 @@ public class MappingProcessor extends AbstractProcessor {
       // Validate return type
       MappingProcessorUtils.validateMethodReturnType(method, messager);
 
+      // Collect @RequestBody types for reflection config
+      collectReflectionTypes(method);
+
       routes.add(new RouteInfo(method, mapping));
     }
 
     // Second pass: generate code
     generateRoutesFile(routes);
+
+    // Third pass: generate reflection config
+    reflectionConfigGenerator.writeConfig();
+  }
+
+  /**
+   * Collects all types that need reflection configuration.
+   */
+  private void collectReflectionTypes(ExecutableElement method) {
+    for (VariableElement param : method.getParameters()) {
+      RequestBody requestBody = param.getAnnotation(RequestBody.class);
+      if (requestBody != null) {
+        // Add the parameter type to reflection config
+        reflectionConfigGenerator.addType(param.asType());
+
+        messager.printMessage(Kind.NOTE,
+            "Found @RequestBody parameter: " + param.asType() +
+                " in method " + method.getSimpleName());
+      }
+    }
   }
 
   private void generateRoutesFile(List<RouteInfo> routes) throws Exception {
