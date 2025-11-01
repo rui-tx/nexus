@@ -1,16 +1,19 @@
 package org.nexus.annotations.processor;
 
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic.Kind;
 import org.nexus.annotations.QueryParam;
+import org.nexus.annotations.RequestBody;
 
 final class MappingParameterProcessor {
 
   private final ProcessingEnvironment processingEnv;
   private final StringBuilder paramCode = new StringBuilder();
+  private final List<String> parameterNames = new ArrayList<>();
   private final StringBuilder invokeArgs = new StringBuilder();
   private final List<String> placeholders;
   private final String endpoint;
@@ -31,20 +34,18 @@ final class MappingParameterProcessor {
     String paramName = param.getSimpleName().toString();
     String typeName = param.asType().toString();
 
-    // Check for @QueryParam annotation
-    QueryParam qp = param.getAnnotation(QueryParam.class);
-    if (qp != null) {
-      processQueryParam(param, qp, paramName, typeName);
+    if (param.getAnnotation(RequestBody.class) != null) {
+      processRequestBody(param);
     } else {
-      processPathParam(param, paramName, typeName);
+      QueryParam qp = param.getAnnotation(QueryParam.class);
+      if (qp != null) {
+        processQueryParam(param, qp, paramName, typeName);
+      } else {
+        processPathParam(param, paramName, typeName);
+      }
     }
 
-    // Add to invocation arguments
-    if (paramIndex < method.getParameters().size() - 1) {
-      invokeArgs.append(paramName).append(", ");
-    } else {
-      invokeArgs.append(paramName);
-    }
+    parameterNames.add(paramName);
   }
 
   private void processQueryParam(VariableElement param, QueryParam qp,
@@ -94,6 +95,21 @@ final class MappingParameterProcessor {
 
     paramCode.append("        ").append(typeName).append(" ").append(paramName)
         .append(" = ").append(conversion).append(";\n");
+  }
+
+  private void processRequestBody(VariableElement param) {
+    String paramType = param.asType().toString();
+    String paramName = param.getSimpleName().toString();
+
+    paramCode
+        .append(paramType).append(" ").append(paramName).append(";\n")
+        .append("        try {\n");
+    paramCode.append("          ").append(paramName)
+        .append(" = MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);\n");
+    paramCode.append("        } catch (JsonProcessingException e) {\n");
+    paramCode.append("          throw new RuntimeException(e);\n");
+    paramCode.append("        }\n");
+
   }
 
   private String buildQueryParamValueExpression(QueryParam qp, String qpName, String raw) {
@@ -151,6 +167,6 @@ final class MappingParameterProcessor {
   }
 
   String getInvokeArgs() {
-    return invokeArgs.toString();
+    return String.join(", ", parameterNames);
   }
 }

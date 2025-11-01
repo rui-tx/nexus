@@ -6,6 +6,7 @@ import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import org.nexus.annotations.Mapping;
+import org.nexus.annotations.RequestBody;
 import org.nexus.annotations.Secured;
 import org.nexus.enums.HttpMethod;
 import org.slf4j.Logger;
@@ -22,6 +23,16 @@ public class Api {
     CompletableFuture<Response<String>> future = new CompletableFuture<>();
     future.complete(new Response<>(200, "up"));
     return future;
+  }
+
+  @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
+  public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
+    return CompletableFuture.supplyAsync(() -> {
+      return new Response<>(
+          200,
+          "%d: %s %s".formatted(id, request.foo(), request.bar())
+      );
+    }, NexusExecutor.INSTANCE.get());
   }
 
   @Secured(permitAll = true)
@@ -68,5 +79,9 @@ public class Api {
           System.err.println("Error fetching todos: " + ex.getMessage());
           return new Response<>(503, "Failed to connect to external service.");
         });
+  }
+
+  public record PostRequest(String foo, String bar) {
+
   }
 }

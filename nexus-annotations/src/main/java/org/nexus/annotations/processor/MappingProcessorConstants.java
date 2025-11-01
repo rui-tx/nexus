@@ -10,6 +10,8 @@ public final class MappingProcessorConstants {
   public static final String GENERATED_CLASS_HEADER = """
       package %s;
       
+      import com.fasterxml.jackson.core.JsonProcessingException;
+      import com.fasterxml.jackson.databind.ObjectMapper;
       import org.nexus.Route;
       import org.nexus.interfaces.ProblemDetails;
       import org.nexus.enums.ProblemDetailsTypes;
@@ -21,6 +23,7 @@ public final class MappingProcessorConstants {
       
       public final class %s {
         private static final Map<String, Route<?>> routeMap = new HashMap<>();
+        private static final ObjectMapper MAPPER = new ObjectMapper();
       
         static {
           try {
