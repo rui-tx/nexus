@@ -4,10 +4,8 @@ import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
-import org.nexus.annotations.Secured;
 import org.nexus.enums.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,44 +15,18 @@ public class Api {
   private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
   private static final String ENDPOINT = "/api/v1";
 
-  @Secured(value = "USER", permissions = "R")
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
   public CompletableFuture<Response<String>> pong() {
-    CompletableFuture<Response<String>> future = new CompletableFuture<>();
-    future.complete(new Response<>(200, "up"));
-    return future;
+    return CompletableFuture.supplyAsync(
+        () -> new Response<>(200, "up"),
+        NexusExecutor.INSTANCE.get());
   }
 
   @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
   public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
-    return CompletableFuture.supplyAsync(() -> {
-      return new Response<>(
-          200,
-          "%d: %s %s".formatted(id, request.foo(), request.bar())
-      );
-    }, NexusExecutor.INSTANCE.get());
-  }
-
-  @Secured(permitAll = true)
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/sleep/:duration")
-  public CompletableFuture<Response<String>> sleep(int duration) {
-    long startTime = System.currentTimeMillis();
-
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        TimeUnit.MILLISECONDS.sleep(duration);
-        long elapseTime = System.currentTimeMillis() - startTime;
-
-        return new Response<>(
-            200,
-            "Response delayed by %dms. Total duration: %sms".
-                formatted(duration, elapseTime)
-        );
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return new Response<>(500, "Thread interrupted during sleep.");
-      }
-    }, NexusExecutor.INSTANCE.get());
+    return CompletableFuture.supplyAsync(
+        () -> new Response<>(200, "%d: %s %s".formatted(id, request.foo(), request.bar())),
+        NexusExecutor.INSTANCE.get());
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/external-call")
@@ -76,7 +48,7 @@ public class Api {
                 httpResponse.body()
             ))
         .exceptionally(ex -> {
-          System.err.println("Error fetching todos: " + ex.getMessage());
+          LOGGER.error("Error fetching todos: {}", ex.getMessage());
           return new Response<>(503, "Failed to connect to external service.");
         });
   }
