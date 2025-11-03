@@ -107,7 +107,16 @@ final class MappingParameterProcessor {
     paramCode.append("          ").append(paramName)
         .append(" = MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);\n");
     paramCode.append("        } catch (JsonProcessingException e) {\n");
-    paramCode.append("          throw new RuntimeException(e);\n");
+    paramCode.append("          throw new ProblemDetailsException(\n");
+    paramCode.append("            new ProblemDetails.Single(\n");
+    paramCode.append("              ProblemDetailsTypes.CLIENT_ERROR,\n");
+    paramCode.append("              \"Invalid request\",\n");
+    paramCode.append("              400,\n");
+    paramCode.append("              \"Invalid JSON request body: \" + e.getMessage(),\n");
+    paramCode.append("              \"\",\n");
+    paramCode.append("              Map.of()\n");
+    paramCode.append("            )\n");
+    paramCode.append("          );\n");
     paramCode.append("        }\n");
 
   }

@@ -15,13 +15,13 @@
     "allDeclaredMethods": true
   },
   {
-    "name": "org.nexus.ProblemDetails$Single",
+    "name": "org.nexus.interfaces.ProblemDetails$Single",
     "allPublicConstructors": true,
     "allPublicMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "org.nexus.ProblemDetails$Multiple",
+    "name": "org.nexus.interfaces.ProblemDetails$Multiple",
     "allPublicConstructors": true,
     "allPublicMethods": true,
     "allDeclaredFields": true
