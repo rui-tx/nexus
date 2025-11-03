@@ -18,7 +18,6 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.FileObject;
 import javax.tools.StandardLocation;
@@ -28,27 +27,30 @@ import javax.tools.StandardLocation;
  */
 final class ReflectionConfigGenerator {
 
-  private final ProcessingEnvironment processingEnv;
+  private static final String FILE_NAME = "generated-reflect-config.json";
+  private static final String FILE_PATH = "META-INF/native-image/%s".formatted(FILE_NAME);
+
+  //private final ProcessingEnvironment processingEnv;
   private final Messager messager;
   private final Filer filer;
-  private final Types typeUtils;
+  //private final Types typeUtils;
   private final Elements elementUtils;
   private final Set<String> processedTypes = new HashSet<>();
   private final List<ReflectionEntry> entries = new ArrayList<>();
   private final ObjectMapper objectMapper;
 
   ReflectionConfigGenerator(ProcessingEnvironment processingEnv) {
-    this.processingEnv = processingEnv;
+    //this.processingEnv = processingEnv;
     this.messager = processingEnv.getMessager();
     this.filer = processingEnv.getFiler();
-    this.typeUtils = processingEnv.getTypeUtils();
+    //this.typeUtils = processingEnv.getTypeUtils();
     this.elementUtils = processingEnv.getElementUtils();
     this.objectMapper = new ObjectMapper();
     this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   /**
-   * Adds a type to be included in the reflection config. Recursively processes nested types.
+   * Adds a type to be included in the reflection config
    */
   void addType(TypeMirror type) {
     if (type == null) {
@@ -77,7 +79,7 @@ final class ReflectionConfigGenerator {
     entries.add(entry);
 
     messager.printMessage(Kind.NOTE,
-        "Adding reflection config for: " + typeName);
+        "Adding reflection config for: %s".formatted(typeName));
 
     // Process nested types (fields of this type)
     processNestedTypes(typeElement);
@@ -88,18 +90,13 @@ final class ReflectionConfigGenerator {
    */
   private ReflectionEntry createReflectionEntry(TypeElement typeElement) {
     ReflectionEntry entry = new ReflectionEntry();
-    entry.name = typeElement.getQualifiedName().toString();
 
-    // For records and regular classes, we need:
-    // - All constructors (including canonical constructor for records)
-    // - All methods (getters/accessors)
-    // - All fields
+    entry.name = elementUtils.getBinaryName(typeElement).toString();
     entry.allDeclaredConstructors = true;
     entry.allDeclaredMethods = true;
     entry.allDeclaredFields = true;
-
-    // Enable unsafe allocation for Jackson (helps with some edge cases)
-    entry.unsafeAllocated = true;
+    entry.queryAllDeclaredConstructors = true;
+    entry.queryAllPublicConstructors = true;
 
     return entry;
   }
@@ -148,15 +145,13 @@ final class ReflectionConfigGenerator {
     // Sort entries by name for consistent output
     entries.sort(Comparator.comparing(e -> e.name));
 
-    // Create JSON using Jackson
     String json = objectMapper.writeValueAsString(entries);
 
-    // Write to META-INF/native-image/reflect-config.json
     try {
       FileObject resource = filer.createResource(
           StandardLocation.CLASS_OUTPUT,
           "",
-          "META-INF/native-image/reflect-config.json"
+          FILE_PATH
       );
 
       try (Writer writer = resource.openWriter()) {
@@ -164,17 +159,17 @@ final class ReflectionConfigGenerator {
       }
 
       messager.printMessage(Kind.NOTE,
-          "Generated reflect-config.json with " + entries.size() + " entries");
+          "Generated %s with %d entries".formatted(FILE_NAME, entries.size()));
 
     } catch (IOException e) {
       messager.printMessage(Kind.WARNING,
-          "Could not write reflect-config.json: " + e.getMessage());
+          "Could not write %s: %s".formatted(FILE_NAME, e.getMessage()));
 
       // Fallback: write to root of classes directory
       FileObject fallback = filer.createResource(
           StandardLocation.CLASS_OUTPUT,
           "",
-          "reflect-config.json"
+          FILE_NAME
       );
 
       try (Writer writer = fallback.openWriter()) {
@@ -182,11 +177,9 @@ final class ReflectionConfigGenerator {
       }
 
       messager.printMessage(Kind.NOTE,
-          "Wrote reflect-config.json to class output root instead");
+          "Wrote %s to class output root instead".formatted(FILE_NAME));
     }
   }
-
-  // Helper methods
 
   private String getQualifiedName(TypeMirror type) {
     if (type instanceof DeclaredType declaredType) {
@@ -232,15 +225,13 @@ final class ReflectionConfigGenerator {
         typeName.startsWith("java.util.Collection");
   }
 
-  /**
-   * JSON structure for GraalVM reflection config entries.
-   */
   private static class ReflectionEntry {
 
     public String name;
     public Boolean allDeclaredConstructors;
     public Boolean allDeclaredMethods;
     public Boolean allDeclaredFields;
-    public Boolean unsafeAllocated;
+    public Boolean queryAllDeclaredConstructors;
+    public Boolean queryAllPublicConstructors;
   }
 }

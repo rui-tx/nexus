@@ -80,8 +80,9 @@
                 <buildArg>-H:Name=nexus-${revision}</buildArg>
 <!--                <buildArg>-H:AdvancedObfuscation=</buildArg>-->
                 <buildArg>-H:ReflectionConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/reflect-config.json</buildArg>
-                <buildArg>-H:ReflectionConfigurationFiles=${project.build.outputDirectory}/META-INF/native-image/reflect-config.json</buildArg>
                 <buildArg>-H:ResourceConfigurationFiles=${project.basedir}/src/main/resources/META-INF/native-image/resource-config.json</buildArg>
+                <!-- Generated automatically from nexus-api -->
+                <buildArg>-H:ReflectionConfigurationFiles=${project.parent.basedir}/nexus-api/target/classes/META-INF/native-image/generated-reflect-config.json</buildArg>
               </buildArgs>
             </configuration>
             <executions>
