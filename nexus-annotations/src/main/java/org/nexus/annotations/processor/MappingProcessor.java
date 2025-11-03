@@ -19,6 +19,7 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 import org.nexus.annotations.Mapping;
@@ -114,6 +115,7 @@ public class MappingProcessor extends AbstractProcessor {
    * Collects all types that need reflection configuration.
    */
   private void collectReflectionTypes(ExecutableElement method) {
+    // Process method parameters with @RequestBody
     for (VariableElement param : method.getParameters()) {
       RequestBody requestBody = param.getAnnotation(RequestBody.class);
       if (requestBody != null) {
@@ -125,6 +127,14 @@ public class MappingProcessor extends AbstractProcessor {
                 " in method " + method.getSimpleName());
       }
     }
+
+    // Process return type
+    TypeMirror returnType = method.getReturnType();
+    reflectionConfigGenerator.processReturnType(returnType);
+
+    messager.printMessage(Kind.NOTE,
+        "Processing return type: " + returnType +
+            " for method " + method.getSimpleName());
   }
 
   private void generateRoutesFile(List<RouteInfo> routes) throws Exception {

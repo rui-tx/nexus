@@ -16,6 +16,7 @@ import io.netty.util.CharsetUtil;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionException;
 import nexus.generated.GeneratedRoutes;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
@@ -118,6 +119,10 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     // add to the response all the headers from middleware, etc...
     if (requestContext != null && requestContext.getRequestHeaders() != null) {
+      requestContext.getRequestHeaders().add(
+          "X-Process-Time",
+          requestContext.getRequestDuration());
+
       httpResponse.headers().add(requestContext.getRequestHeaders());
     }
 
@@ -159,9 +164,12 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
   }
 
   private void handleError(ChannelHandlerContext ctx, Throwable error, boolean keepAlive) {
-    Response<?> errorResponse = (error instanceof ProblemDetailsException pde)
+    // Unwrap CompletionException to get to the root cause
+    Throwable cause = error instanceof CompletionException ? error.getCause() : error;
+
+    Response<?> errorResponse = (cause instanceof ProblemDetailsException pde)
         ? new Response<>(pde.getProblemDetails().getStatus(), pde.getProblemDetails())
-        : createErrorResponse(error);
+        : createErrorResponse(cause);
 
     sendResponse(ctx, errorResponse, keepAlive);
   }

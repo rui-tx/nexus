@@ -16,6 +16,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.tools.Diagnostic.Kind;
@@ -78,7 +79,7 @@ final class ReflectionConfigGenerator {
     ReflectionEntry entry = createReflectionEntry(typeElement);
     entries.add(entry);
 
-    messager.printMessage(Kind.NOTE,
+    messager.printMessage(Kind.WARNING,
         "Adding reflection config for: %s".formatted(typeName));
 
     // Process nested types (fields of this type)
@@ -124,11 +125,163 @@ final class ReflectionConfigGenerator {
         }
       }
 
-      // Handle nested classes (like Api$PostRequest)
+      // Handle nested classes, like Api$ExampleRequest
       if (enclosed.getKind() == ElementKind.CLASS ||
           enclosed.getKind() == ElementKind.RECORD) {
         addType(enclosed.asType());
       }
+    }
+  }
+
+  public void processReturnType(TypeMirror returnType) {
+    if (returnType == null) {
+      return;
+    }
+
+    // Handle CompletableFuture<Response<T>> pattern
+    if (returnType.getKind() == TypeKind.DECLARED) {
+      DeclaredType declaredType = (DeclaredType) returnType;
+      String typeName = declaredType.toString();
+
+      // If it's a CompletableFuture with Response<T>, process its type arguments
+      if (typeName.startsWith("java.util.concurrent.CompletableFuture<")) {
+        if (!declaredType.getTypeArguments().isEmpty()) {
+          TypeMirror futureTypeArg = declaredType.getTypeArguments().getFirst();
+          if (futureTypeArg.toString().startsWith("org.nexus.Response<")) {
+            if (futureTypeArg instanceof DeclaredType responseType) {
+              if (!responseType.getTypeArguments().isEmpty()) {
+                TypeMirror responseTypeArg = responseType.getTypeArguments().getFirst();
+                messager.printMessage(Kind.NOTE,
+                    "Processing response type: " + responseTypeArg);
+                processTypeRecursively(responseTypeArg);
+              }
+            }
+          } else {
+            // Process the type argument directly if it's not a Response
+            processTypeRecursively(futureTypeArg);
+          }
+        }
+      } else {
+        // Process non-Future return types directly
+        processTypeRecursively(returnType);
+      }
+    } else {
+      // Process non-declared types (primitives, arrays, etc.)
+      processTypeRecursively(returnType);
+    }
+  }
+
+
+  private void processTypeRecursively(TypeMirror type) {
+    if (type == null) {
+      messager.printMessage(Kind.ERROR, "Type is null");
+      return;
+    }
+
+    messager.printMessage(Kind.NOTE, "Processing type: " + type.toString() +
+        " (kind: " + type.getKind() + ")");
+
+    if (type.getKind() == TypeKind.ARRAY) {
+      TypeMirror componentType = ((javax.lang.model.type.ArrayType) type).getComponentType();
+      processTypeRecursively(componentType);
+      return;
+    }
+
+    // Only process declared types (classes, interfaces)
+    if (type.getKind() != TypeKind.DECLARED) {
+      return;
+    }
+
+    DeclaredType declaredType = (DeclaredType) type;
+    Element element = declaredType.asElement();
+
+    if (!(element instanceof TypeElement typeElement)) {
+      return;
+    }
+
+    String typeName = typeElement.getQualifiedName().toString();
+    String binaryName = elementUtils.getBinaryName(typeElement).toString();
+
+    messager.printMessage(Kind.NOTE, "Type: " + typeName +
+        ", Binary: " + binaryName +
+        ", Kind: " + typeElement.getKind());
+
+    // Skip already processed types
+    if (processedTypes.contains(binaryName)) {
+      return;
+    }
+
+    // Skip primitives and common Java types (but still process their type arguments)
+    boolean skipAdding = isPrimitiveOrBoxed(typeName) || isCommonJavaType(typeName);
+    if (!skipAdding) {
+      messager.printMessage(Kind.NOTE, "Adding type to reflection config: " + binaryName);
+
+      // Create and add the reflection entry
+      ReflectionEntry entry = createReflectionEntry(typeElement);
+      entries.add(entry);
+      processedTypes.add(binaryName);
+
+      // Process nested types (fields, etc.)
+      processNestedTypes(typeElement);
+    }
+
+    // ALWAYS process type arguments, even for common types like List
+    for (TypeMirror typeArg : declaredType.getTypeArguments()) {
+      // Special handling for type arguments in nested classes
+      if (typeArg.toString().contains(".") && !typeArg.toString().startsWith("java.")) {
+        processNestedType(typeArg.toString());
+      }
+      processTypeRecursively(typeArg);
+    }
+
+    // Special handling for nested classes in the current compilation unit
+    if (typeName.contains(".") && !typeName.startsWith("java.")) {
+      processNestedType(typeName);
+    }
+  }
+
+  private void processNestedType(String typeName) {
+    // Convert "org.nexus.Example.Foo" to "org.nexus.Example$Foo"
+    String binaryName = typeName.replace('.', '$');
+
+    // If it's a nested class (contains $ but not from an inner class)
+    if (typeName.contains(".") && !binaryName.contains("$")) {
+      binaryName = typeName.replace('.', '$');
+    }
+
+    // Skip if already processed or is a common Java type
+    if (processedTypes.contains(binaryName) ||
+        isPrimitiveOrBoxed(binaryName) ||
+        isCommonJavaType(binaryName)) {
+      return;
+    }
+
+    try {
+      // Try to get the type element
+      TypeElement nestedType = elementUtils.getTypeElement(typeName);
+      if (nestedType != null) {
+        String nestedBinaryName = elementUtils.getBinaryName(nestedType).toString();
+        if (!processedTypes.contains(nestedBinaryName)) {
+          messager.printMessage(Kind.NOTE, "Adding nested type: " + nestedBinaryName);
+          ReflectionEntry entry = createReflectionEntry(nestedType);
+          entries.add(entry);
+          processedTypes.add(nestedBinaryName);
+          processNestedTypes(nestedType);
+        }
+      } else {
+        // If we can't find it directly, try with the binary name
+        nestedType = elementUtils.getTypeElement(binaryName);
+        if (nestedType != null && !processedTypes.contains(binaryName)) {
+          messager.printMessage(Kind.NOTE, "Adding nested type (binary): " + binaryName);
+          ReflectionEntry entry = createReflectionEntry(nestedType);
+          entries.add(entry);
+          processedTypes.add(binaryName);
+          processNestedTypes(nestedType);
+        }
+      }
+    } catch (Exception e) {
+      messager.printMessage(Kind.ERROR,
+          "Error processing nested type " + typeName + ": " + e.getMessage());
     }
   }
 
