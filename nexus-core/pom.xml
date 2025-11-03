@@ -72,7 +72,6 @@
                 <buildArg>--no-fallback</buildArg>
                 <buildArg>--future-defaults=all</buildArg>
                 <buildArg>--initialize-at-build-time=org.slf4j,ch.qos.logback</buildArg>
-                <buildArg>--enable-sbom</buildArg>
 <!--                <buildArg>&#45;&#45;enable-sbom=export</buildArg>-->
 <!--                <buildArg>&#45;&#45;emit build-report</buildArg>-->
                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
