@@ -116,9 +116,10 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
   private void sendResponse(ChannelHandlerContext ctx, Response<?> response, boolean keepAlive) {
     FullHttpResponse httpResponse = response.toHttpResponse();
     RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
-    requestContext.setRequestDuration();
 
-    if (requestContext.getRequestHeaders() != null) {
+    if (requestContext != null && requestContext.getRequestHeaders() != null) {
+      requestContext.setRequestDuration();
+
       // Custom headers
       requestContext.getRequestHeaders().add(
           "X-Response-Time",
@@ -140,12 +141,14 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     // Add a listener to trigger completion callbacks
     future.addListener(f -> {
       // this is needed for 404, because it does not go through middleware
-      if (!f.isSuccess()) {
-        requestContext.complete(null, f.cause());
-        return;
-      }
+      if (requestContext != null) {
+        if (!f.isSuccess()) {
+          requestContext.complete(null, f.cause());
+          return;
+        }
 
-      requestContext.complete(httpResponse, null);
+        requestContext.complete(httpResponse, null);
+      }
     });
 
     if (!keepAlive) {
