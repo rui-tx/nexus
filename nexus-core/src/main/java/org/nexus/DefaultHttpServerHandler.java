@@ -63,7 +63,7 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     // Store the context in the channel's attributes, so we can use it in the sendResponse()
     ctx.channel().attr(REQUEST_CONTEXT_KEY).set(requestContext);
 
-    // Create middleware chain with route execution as the final action
+    // Create a middleware chain with route execution as the final action
     MiddlewareChain chain = DefaultMiddlewareChain.create(
         middlewares,
         () -> executeRoute(route, requestContext, keepAlive)
@@ -116,35 +116,36 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
   private void sendResponse(ChannelHandlerContext ctx, Response<?> response, boolean keepAlive) {
     FullHttpResponse httpResponse = response.toHttpResponse();
     RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
+    requestContext.setRequestDuration();
 
-    // add to the response all the headers from middleware, etc...
-    if (requestContext != null && requestContext.getRequestHeaders() != null) {
+    if (requestContext.getRequestHeaders() != null) {
+      // Custom headers
       requestContext.getRequestHeaders().add(
-          "X-Process-Time",
+          "X-Response-Time",
           requestContext.getRequestDuration());
 
+      // add to the response all the headers from middleware, etc...
       httpResponse.headers().add(requestContext.getRequestHeaders());
     }
 
     if (keepAlive) {
       httpResponse.headers()
           .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
-      //.set(HttpHeaderNames.KEEP_ALIVE, "timeout=5");
     }
 
     HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
 
     ChannelFuture future = ctx.writeAndFlush(httpResponse);
-    // Add listener to trigger completion callbacks
+
+    // Add a listener to trigger completion callbacks
     future.addListener(f -> {
-      // this is needed for 404, because it does nto go through middleware
-      if (requestContext != null) {
-        if (f.isSuccess()) {
-          requestContext.complete(httpResponse, null);
-        } else {
-          requestContext.complete(null, f.cause());
-        }
+      // this is needed for 404, because it does not go through middleware
+      if (!f.isSuccess()) {
+        requestContext.complete(null, f.cause());
+        return;
       }
+
+      requestContext.complete(httpResponse, null);
     });
 
     if (!keepAlive) {

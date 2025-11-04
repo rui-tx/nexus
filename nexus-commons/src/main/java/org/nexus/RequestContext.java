@@ -27,7 +27,7 @@ public final class RequestContext {
   private final long startTime = System.currentTimeMillis();
   private final List<BiConsumer<FullHttpResponse, Throwable>> completionHandlers = new ArrayList<>();
   private final HttpHeaders responseHeaders;
-
+  private long endTime = System.currentTimeMillis();
   private FullHttpResponse response;
   private boolean responseCompleted = false;
 
@@ -96,8 +96,12 @@ public final class RequestContext {
     return (T) attributes.get(key);
   }
 
+  public void setRequestDuration() {
+    endTime = System.currentTimeMillis() - startTime;
+  }
+
   public long getRequestDuration() {
-    return System.currentTimeMillis() - startTime;
+    return endTime;
   }
 
   public void addCompletionHandler(BiConsumer<FullHttpResponse, Throwable> handler) {

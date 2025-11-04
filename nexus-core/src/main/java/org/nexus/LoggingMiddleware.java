@@ -16,11 +16,10 @@ public class LoggingMiddleware implements Middleware {
 
   @Override
   public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
-    long startTime = System.currentTimeMillis();
     logRequest(ctx);
 
     ctx.addCompletionHandler((response, error) -> {
-      logResponse(ctx, startTime, error);
+      logResponse(ctx, error);
     });
 
     try {
@@ -45,8 +44,8 @@ public class LoggingMiddleware implements Middleware {
     }
   }
 
-  private void logResponse(RequestContext ctx, long startTime, Throwable error) {
-    long duration = System.currentTimeMillis() - startTime;
+  private void logResponse(RequestContext ctx, Throwable error) {
+    long duration = ctx.getRequestDuration();
     String requestId = getOrGenerateRequestId(ctx);
     String method = ctx.getRequest().method().name();
     String uri = ctx.getRequest().uri();
