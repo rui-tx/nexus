@@ -27,7 +27,7 @@ import org.nexus.annotations.RequestBody;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Mapping")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
-public class MappingProcessor extends AbstractProcessor {
+public final class MappingProcessor extends AbstractProcessor {
 
   private Filer filer;
   private Messager messager;

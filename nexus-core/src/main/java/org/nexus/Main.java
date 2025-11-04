@@ -78,7 +78,8 @@ public class Main {
     EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
     List<Middleware> middlewares = List.of(
-        new LoggingMiddleware()
+        new LoggingMiddleware(),
+        new SecurityMiddleware()
     );
 
     ServerBootstrap bootstrap = new ServerBootstrap();

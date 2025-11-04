@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
+import org.nexus.annotations.Secured;
 import org.nexus.dto.UserDto;
 import org.nexus.enums.HttpMethod;
 import org.nexus.enums.ProblemDetailsTypes;
@@ -28,6 +29,7 @@ public class Api {
   private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
   private static final String ENDPOINT = "/api/v1";
 
+  @Secured
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
   public CompletableFuture<Response<String>> pong() {
     return CompletableFuture.supplyAsync(
