@@ -87,11 +87,19 @@ public class LoggingMiddleware implements Middleware {
   }
 
   private String getOrGenerateRequestId(RequestContext ctx) {
-    String requestId = ctx.getRequest().headers().get(REQUEST_ID_HEADER);
+    // First, check response headers (outgoing)
+    String requestId = ctx.getRequestHeaders().get(REQUEST_ID_HEADER);
+    if (requestId != null) {
+      return requestId;
+    }
+
+    // Then, check request headers (incoming)
+    requestId = ctx.getRequest().headers().get(REQUEST_ID_HEADER);
     if (requestId == null) {
       requestId = UUID.randomUUID().toString();
     }
 
+    // Add to response headers only if not already present
     ctx.getRequestHeaders().add(REQUEST_ID_HEADER, requestId);
     return requestId;
   }

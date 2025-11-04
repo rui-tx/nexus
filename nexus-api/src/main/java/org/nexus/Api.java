@@ -29,7 +29,7 @@ public class Api {
   private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
   private static final String ENDPOINT = "/api/v1";
 
-  @Secured
+  @Secured(permitAll = true)
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
   public CompletableFuture<Response<String>> pong() {
     return CompletableFuture.supplyAsync(
@@ -37,6 +37,7 @@ public class Api {
         NexusExecutor.INSTANCE.get());
   }
 
+  @Secured
   @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
   public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
     return CompletableFuture.supplyAsync(
