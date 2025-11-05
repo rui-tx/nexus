@@ -15,6 +15,8 @@ Netty-based web server
 - Route table generated at build time
 - `reflection-config.json` automatically generated at build time for objects annotated with
   `@RequestBody` (GraalVM native image)
+- DI registry with @Controller, @Service, @Repository annotations built at build time
+- Middleware system
 
 # Usage
 
@@ -57,6 +59,7 @@ Run it
 Build and run
 
 ```
+sh dockerfile-update.sh
 podman compose up --build
 ```
 
@@ -73,56 +76,18 @@ curl -s 'http://localhost:15000/api/v1/heartbeat'
 }
 ```
 
-## Example
-
-Api.java
-
-```java
-public class Api {
-
-  private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
-  private static final String ENDPOINT = "/api/v1";
-
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
-  public CompletableFuture<Response<String>> pong() {
-    return CompletableFuture.supplyAsync(
-        () -> new Response<>(200, "up"),
-        NexusExecutor.INSTANCE.get());
-  }
-
-  @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
-  public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
-    return CompletableFuture.supplyAsync(
-        () -> new Response<>(200, "%d: %s %s".formatted(id, request.foo(), request.bar())),
-        NexusExecutor.INSTANCE.get());
-  }
-
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/external-call")
-  public CompletableFuture<Response<String>> externalCall() {
-    String apiUrl = "https://jsonplaceholder.typicode.com/todos";
-
-    HttpRequest request = HttpRequest.newBuilder(URI.create(apiUrl))
-        .GET()
-        .header("Accept", "application/json")
-        .build();
-
-    return NexusHttpClient.INSTANCE.get().sendAsync(
-            request,
-            HttpResponse.BodyHandlers.ofString()
-        )
-        .thenApply(httpResponse ->
-            new Response<>(
-                httpResponse.statusCode(),
-                httpResponse.body()
-            ))
-        .exceptionally(ex -> {
-          LOGGER.error("Error fetching todos: {}", ex.getMessage());
-          return new Response<>(503, "Failed to connect to external service.");
-        });
-  }
-
-  public record PostRequest(String foo, String bar) {
-
-  }
-}
+```
+Apple MacBook Air M3 16GB
+bombardier version 2.0.2 darwin/arm64
+bombardier -c 1024 -n 5000000 http://localhost:15000/api/v1/heartbeat
+Bombarding http://localhost:15000/api/v1/heartbeat with 5000000 request(s) using 1024 connection(s)
+ 5000000 / 5000000 [============================================================================] 100.00% 109665/s 45s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec    110041.57   16194.75  170102.92
+  Latency        9.31ms     5.04ms   297.72ms
+  HTTP codes:
+    1xx - 0, 2xx - 5000000, 3xx - 0, 4xx - 0, 5xx - 0
+    others - 0
+  Throughput:    30.90MB/s
 ```
