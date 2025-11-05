@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 public final class RequestContext {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestContext.class);
+  
   private final ChannelHandlerContext nettyCtx;
   private final FullHttpRequest request;
   private final Map<String, String> pathParams;

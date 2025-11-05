@@ -1,9 +1,10 @@
-package org.nexus;
+package org.nexus.middleware;
 
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
 import java.util.UUID;
+import org.nexus.RequestContext;
 import org.nexus.interfaces.Middleware;
 import org.nexus.interfaces.MiddlewareChain;
 import org.slf4j.Logger;

@@ -1,8 +1,9 @@
-package org.nexus;
+package org.nexus.middleware;
 
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import org.nexus.RequestContext;
 import org.nexus.interfaces.Middleware;
 import org.nexus.interfaces.MiddlewareChain;
 

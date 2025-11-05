@@ -1,9 +1,11 @@
-package org.nexus;
+package org.nexus.middleware;
 
 import io.netty.handler.codec.http.FullHttpRequest;
 import java.util.Map;
 import java.util.Set;
 import nexus.generated.GeneratedSecurityRules;
+import org.nexus.RequestContext;
+import org.nexus.SecurityRule;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;

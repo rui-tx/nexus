@@ -176,13 +176,12 @@ public final class MappingProcessor extends AbstractProcessor {
     String paramCode = paramProcessor.getParamCode();
     String invokeArgs = paramProcessor.getInvokeArgs();
 
-    // Build the route mapping
     return String.format("""
                 routeMap.put(
                   %s,
                   new Route<%s>(%s, "%s", rc -> {
                     %s
-                    %s controller = new %s();
+                    %s controller = org.nexus.NexusDIRegistry.getInstance().get(%s.class);
                     try {
                       return controller.%s(%s);
                     } catch (Exception e) {

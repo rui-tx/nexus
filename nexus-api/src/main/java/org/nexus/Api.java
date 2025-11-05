@@ -1,7 +1,8 @@
 package org.nexus;
 
+import static org.nexus.NexusUtils.DF_MAPPER;
+
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import org.nexus.annotations.Controller;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
 import org.nexus.annotations.Secured;
@@ -23,9 +25,9 @@ import org.nexus.interfaces.ProblemDetails.Single;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Controller
 public class Api {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
   private static final String ENDPOINT = "/api/v1";
 
@@ -37,7 +39,7 @@ public class Api {
         NexusExecutor.INSTANCE.get());
   }
 
-  @Secured
+  @Secured(permitAll = true)
   @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
   public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
     return CompletableFuture.supplyAsync(
@@ -45,6 +47,7 @@ public class Api {
         NexusExecutor.INSTANCE.get());
   }
 
+  @Secured
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/external-call")
   public CompletableFuture<Response<List<Todo>>> externalCall() {
     String apiUrl = "https://jsonplaceholder.typicode.com/todos";
@@ -61,7 +64,7 @@ public class Api {
         .thenApply(httpResponse -> {
           int status = httpResponse.statusCode();
           try (InputStream bodyStream = httpResponse.body()) {
-            List<Todo> todos = MAPPER.readValue(bodyStream, new TypeReference<>() {
+            List<Todo> todos = DF_MAPPER.readValue(bodyStream, new TypeReference<>() {
             });
             return new Response<>(status, todos);
           } catch (IOException e) {
@@ -76,6 +79,7 @@ public class Api {
         });
   }
 
+  @Secured
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/user")
   public CompletableFuture<Response<UserDto>> getUser() {
     String apiUrl = "https://jsonplaceholder.typicode.com/users/1";
@@ -92,7 +96,7 @@ public class Api {
         .thenApply(httpResponse -> {
           int status = httpResponse.statusCode();
           try {
-            UserDto user = MAPPER.readValue(httpResponse.body(), UserDto.class);
+            UserDto user = DF_MAPPER.readValue(httpResponse.body(), UserDto.class);
             return new Response<>(status, user);
           } catch (Exception e) {
             LOGGER.error("Error parsing user: {}", e.getMessage());

@@ -14,9 +14,13 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
+import nexus.generated.GeneratedDIInitializer;
+import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
 import org.nexus.interfaces.Middleware;
+import org.nexus.middleware.LoggingMiddleware;
+import org.nexus.middleware.SecurityMiddleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,6 +85,9 @@ public class Main {
         new LoggingMiddleware(),
         new SecurityMiddleware()
     );
+
+    // Initialize dependency injection for controllers, services and repos
+    GeneratedDIInitializer.initialize();
 
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)

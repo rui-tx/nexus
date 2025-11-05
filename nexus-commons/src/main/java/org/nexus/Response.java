@@ -1,8 +1,9 @@
 package org.nexus;
 
+import static org.nexus.NexusUtils.DF_MAPPER;
+
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -20,8 +21,6 @@ import org.slf4j.LoggerFactory;
 public class Response<T> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Response.class);
-
-  private final ObjectMapper mapper = new ObjectMapper();
 
   private final int statusCode;
   private final T body;
@@ -63,10 +62,10 @@ public class Response<T> {
 
     try {
       if (isProblem) {
-        parsed = mapper.writeValueAsString(body);
+        parsed = DF_MAPPER.writeValueAsString(body);
       } else if (responseType == ResponseType.JSON) {
         ApiResponse wrapper = new ApiResponse(statusCode, body);
-        parsed = mapper.writeValueAsString(wrapper);
+        parsed = DF_MAPPER.writeValueAsString(wrapper);
       } else {
         parsed = body != null ? body.toString() : "null";
       }

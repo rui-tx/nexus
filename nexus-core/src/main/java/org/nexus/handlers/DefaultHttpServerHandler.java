@@ -1,4 +1,4 @@
-package org.nexus;
+package org.nexus.handlers;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -18,16 +18,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
 import nexus.generated.GeneratedRoutes;
+import org.nexus.PathMatcher;
+import org.nexus.RequestContext;
+import org.nexus.Response;
+import org.nexus.Route;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
 import org.nexus.interfaces.MiddlewareChain;
 import org.nexus.interfaces.ProblemDetails;
 import org.nexus.interfaces.ProblemDetails.Single;
+import org.nexus.middleware.DefaultMiddlewareChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
+public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHttpServerHandler.class);
   private static final AttributeKey<RequestContext> REQUEST_CONTEXT_KEY =
