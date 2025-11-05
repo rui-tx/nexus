@@ -124,8 +124,9 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
     }
 
     if (keepAlive) {
-      httpResponse.headers()
-          .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+      httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+    } else {
+      httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
     }
 
     HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
