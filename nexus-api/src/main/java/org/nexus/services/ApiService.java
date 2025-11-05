@@ -3,6 +3,7 @@ package org.nexus.services;
 import static org.nexus.NexusUtils.DF_MAPPER;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import io.netty.handler.codec.http.FullHttpResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
@@ -12,9 +13,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
+import org.nexus.CachedHttpResponse;
 import org.nexus.NexusExecutor;
 import org.nexus.NexusHttpClient;
 import org.nexus.Response;
+import org.nexus.StaticResponseRegistry;
 import org.nexus.annotations.Service;
 import org.nexus.dto.PostRequest;
 import org.nexus.dto.Todo;
@@ -31,6 +34,11 @@ public class ApiService {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ApiService.class);
 
+  // pre computed responses
+  static {
+    StaticResponseRegistry.register("heartbeat", "up", 200);
+  }
+
   private final ApiRepository apiRepository;
 
   public ApiService(ApiRepository apiRepository) {
@@ -38,9 +46,8 @@ public class ApiService {
   }
 
   public CompletableFuture<Response<String>> pong() {
-    return CompletableFuture.supplyAsync(
-        () -> new Response<>(200, "up"),
-        NexusExecutor.INSTANCE.get());
+    FullHttpResponse preComputed = StaticResponseRegistry.get("heartbeat");
+    return CompletableFuture.completedFuture(new CachedHttpResponse(preComputed));
   }
 
   public CompletableFuture<Response<String>> testPOST(int id, PostRequest request) {
