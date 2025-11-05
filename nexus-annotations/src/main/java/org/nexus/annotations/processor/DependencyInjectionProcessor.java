@@ -27,16 +27,17 @@ import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 import org.nexus.annotations.Controller;
-
+import org.nexus.annotations.Repository;
+import org.nexus.annotations.Service;
 
 /**
  * Processes @Controller, @Service, and @Repository annotations to generate dependency injection
  * initialization code at compile time.
  */
 @SupportedAnnotationTypes({
-    "org.nexus.annotations.Controller"
-//    "org.nexus.annotations.Service",
-//    "org.nexus.annotations.Repository"
+    "org.nexus.annotations.Controller",
+    "org.nexus.annotations.Service",
+    "org.nexus.annotations.Repository"
 })
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class DependencyInjectionProcessor extends AbstractProcessor {
@@ -83,13 +84,13 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
     List<ComponentInfo> components = new ArrayList<>();
 
     // Collect all annotated classes
-//    for (Element element : roundEnv.getElementsAnnotatedWith(Repository.class)) {
-//      components.add(processComponent(element, ComponentType.REPOSITORY));
-//    }
+    for (Element element : roundEnv.getElementsAnnotatedWith(Repository.class)) {
+      components.add(processComponent(element, ComponentType.REPOSITORY));
+    }
 
-//    for (Element element : roundEnv.getElementsAnnotatedWith(Service.class)) {
-//      components.add(processComponent(element, ComponentType.SERVICE));
-//    }
+    for (Element element : roundEnv.getElementsAnnotatedWith(Service.class)) {
+      components.add(processComponent(element, ComponentType.SERVICE));
+    }
 
     for (Element element : roundEnv.getElementsAnnotatedWith(Controller.class)) {
       components.add(processComponent(element, ComponentType.CONTROLLER));
@@ -123,7 +124,7 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
 
     // Use the first public constructor, or the only constructor
     ExecutableElement constructor = constructors.size() == 1
-        ? constructors.get(0)
+        ? constructors.getFirst()
         : constructors.stream()
             .filter(c -> c.getModifiers().contains(Modifier.PUBLIC))
             .findFirst()
@@ -151,9 +152,9 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
     for (ComponentInfo comp : components) {
       for (String dep : comp.dependencies) {
         // Special cases: DataSource and other external dependencies
-        if (isExternalDependency(dep)) {
-          continue;
-        }
+//        if (isExternalDependency(dep)) {
+//          continue;
+//        }
 
         if (!componentMap.containsKey(dep)) {
           messager.printMessage(Kind.ERROR,
@@ -166,15 +167,15 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
     // TODO: Add cycle detection if needed
   }
 
-  private boolean isExternalDependency(String type) {
-    // List of known external dependencies that don't need DI annotations
-    return type.equals("com.zaxxer.hikari.HikariDataSource") ||
-        type.equals("javax.sql.DataSource");
-  }
+//  private boolean isExternalDependency(String type) {
+//    // List of known external dependencies that don't need DI annotations
+//    return type.equals("com.zaxxer.hikari.HikariDataSource") ||
+//        type.equals("javax.sql.DataSource");
+//  }
 
   private void generateDIInitializer(List<ComponentInfo> components) throws Exception {
     // Sort components by dependency order (repositories -> services -> controllers)
-    List<ComponentInfo> sorted = topologicalSort(components);
+    List<ComponentInfo> sorted = sort(components);
 
     StringBuilder sb = new StringBuilder();
     sb.append("package nexus.generated;\n\n");
@@ -214,11 +215,11 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
       // Add constructor arguments
       List<String> args = new ArrayList<>();
       for (String dep : comp.dependencies) {
-        if (isExternalDependency(dep)) {
-          args.add("dataSource");
-        } else {
-          args.add(varNames.get(dep));
-        }
+//        if (isExternalDependency(dep)) {
+//          args.add("dataSource");
+//        } else {
+        args.add(varNames.get(dep));
+//        }
       }
       sb.append(String.join(", ", args));
       sb.append(");\n");
@@ -246,7 +247,7 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
         "Generated GeneratedDIInitializer with " + components.size() + " components");
   }
 
-  private List<ComponentInfo> topologicalSort(List<ComponentInfo> components) {
+  private List<ComponentInfo> sort(List<ComponentInfo> components) {
     // Simple sorting: repositories first, then services, then controllers
     List<ComponentInfo> sorted = new ArrayList<>(components);
     sorted.sort(Comparator.comparing(c -> c.type.ordinal()));

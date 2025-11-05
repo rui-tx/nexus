@@ -1,4 +1,4 @@
-package org.nexus;
+package org.nexus.services;
 
 import static org.nexus.NexusUtils.DF_MAPPER;
 
@@ -8,47 +8,47 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
-import org.nexus.annotations.Controller;
-import org.nexus.annotations.Mapping;
-import org.nexus.annotations.RequestBody;
-import org.nexus.annotations.Secured;
+import org.nexus.NexusExecutor;
+import org.nexus.NexusHttpClient;
+import org.nexus.Response;
+import org.nexus.annotations.Service;
+import org.nexus.dto.PostRequest;
+import org.nexus.dto.Todo;
 import org.nexus.dto.UserDto;
-import org.nexus.enums.HttpMethod;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.ProblemDetails.Single;
+import org.nexus.repositories.ApiRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Controller
-public class Api {
+@Service
+public class ApiService {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Api.class);
-  private static final String ENDPOINT = "/api/v1";
+  private static final Logger LOGGER = LoggerFactory.getLogger(ApiService.class);
 
-  @Secured(permitAll = true)
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/heartbeat")
+  private final ApiRepository apiRepository;
+
+  public ApiService(ApiRepository apiRepository) {
+    this.apiRepository = apiRepository;
+  }
+
   public CompletableFuture<Response<String>> pong() {
     return CompletableFuture.supplyAsync(
         () -> new Response<>(200, "up"),
         NexusExecutor.INSTANCE.get());
   }
 
-  @Secured(permitAll = true)
-  @Mapping(type = HttpMethod.POST, endpoint = ENDPOINT + "/post/:id")
-  public CompletableFuture<Response<String>> testPOST(int id, @RequestBody PostRequest request) {
+  public CompletableFuture<Response<String>> testPOST(int id, PostRequest request) {
     return CompletableFuture.supplyAsync(
         () -> new Response<>(200, "%d: %s %s".formatted(id, request.foo(), request.bar())),
         NexusExecutor.INSTANCE.get());
   }
 
-  @Secured
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/external-call")
   public CompletableFuture<Response<List<Todo>>> externalCall() {
     String apiUrl = "https://jsonplaceholder.typicode.com/todos";
 
@@ -79,8 +79,6 @@ public class Api {
         });
   }
 
-  @Secured
-  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/user")
   public CompletableFuture<Response<UserDto>> getUser() {
     String apiUrl = "https://jsonplaceholder.typicode.com/users/1";
 
@@ -121,18 +119,5 @@ public class Api {
               Map.of("exception", Objects.toString(ex.getMessage(), ex.getClass().getSimpleName()))
           ));
         });
-  }
-
-
-  public record PostRequest(String foo, String bar) {
-
-  }
-
-  public record Todo(int userId, int id, String title, boolean completed) {
-
-    public static List<Todo> emptyList() {
-      return new ArrayList<>();
-    }
-
   }
 }

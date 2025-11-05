@@ -13,6 +13,7 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
+import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -102,6 +103,11 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
   }
 
   private void sendResponse(ChannelHandlerContext ctx, Response<?> response, boolean keepAlive) {
+    if (!ctx.channel().isActive()) {
+      LOGGER.debug("Channel closed, skipping response send");
+      return;
+    }
+
     FullHttpResponse httpResponse = response.toHttpResponse();
     RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
 
@@ -125,20 +131,18 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
     HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
 
     ChannelFuture future = ctx.writeAndFlush(httpResponse);
-
-    // Add a listener to trigger completion callbacks
     future.addListener(f -> {
-      // this is needed for 404, because it does not go through middleware
       if (requestContext != null) {
-        if (!f.isSuccess()) {
-          requestContext.complete(null, f.cause());
-          return;
-        }
+        if (!f.isSuccess() && f.cause() instanceof ClosedChannelException) {
+          LOGGER.debug("Channel closed during write, ignoring", f.cause());
+        } else if (!f.isSuccess()) {
 
-        requestContext.complete(httpResponse, null);
+          requestContext.complete(null, f.cause());  // Other errors
+        } else {
+          requestContext.complete(httpResponse, null);
+        }
       }
     });
-
     if (!keepAlive) {
       future.addListener(ChannelFutureListener.CLOSE);
     }
