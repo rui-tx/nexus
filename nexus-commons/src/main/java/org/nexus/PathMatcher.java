@@ -1,7 +1,10 @@
 package org.nexus;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -67,8 +70,45 @@ public final class PathMatcher {
         : Result.NO_MATCH;
   }
 
-  private static String normalise(String s) {
-    return "/" + s.replaceAll("^/+|/+$", "").replaceAll("/+", "/");
+  public static String normalise(String s) {
+    if (s == null || s.isEmpty()) {
+      return "/";
+    }
+
+    StringBuilder sb = new StringBuilder(s.length());
+    boolean inSlash = false;
+    boolean started = false;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c == '/') {
+        if (!started) {
+          continue; // Skip leading slashes
+        }
+        if (inSlash) {
+          continue; // Collapse multiple slashes
+        }
+        inSlash = true;
+        sb.append('/');
+      } else {
+        started = true;
+        inSlash = false;
+        sb.append(c);
+      }
+    }
+
+    // Remove trailing slash if present and not the only character
+    int len = sb.length();
+    if (len > 1 && sb.charAt(len - 1) == '/') {
+      sb.setLength(len - 1);
+    }
+
+    // Prepend '/' if the result is not empty
+    if (!sb.isEmpty() && sb.charAt(0) != '/') {
+      sb.insert(0, '/');
+    } else if (sb.isEmpty()) {
+      sb.append('/');
+    }
+    return sb.toString();
   }
 
   public record Result(boolean matches, Map<String, String> params) {
@@ -78,6 +118,61 @@ public final class PathMatcher {
     public Result(boolean matches, Map<String, String> params) {
       this.matches = matches;
       this.params = Map.copyOf(params);
+    }
+  }
+
+  public record CompiledPattern(Pattern pattern, List<String> paramNames) {
+
+    /**
+     * Factory to compile a template into a CompiledPattern (called once at startup).
+     */
+    public static CompiledPattern compile(String template) {
+      template = normalise(template);
+
+      String[] tmplSegs = template.split("/");
+      StringBuilder regex = new StringBuilder("^");
+      List<String> paramNames = new ArrayList<>();
+
+      for (int i = 0; i < tmplSegs.length; i++) {
+        String t = tmplSegs[i];
+        if (t.isEmpty()) {
+          regex.append("/?");
+          continue;
+        }
+        if (t.startsWith(":")) {
+          String name = t.substring(1);
+          regex.append("(?<").append(name).append(">[^/]+)");
+          paramNames.add(name);
+        } else {
+          regex.append(Pattern.quote(t));
+        }
+        if (i < tmplSegs.length - 1) {
+          regex.append("/");
+        } else {
+          regex.append("$");
+        }
+      }
+
+      Pattern p = Pattern.compile(regex.toString());
+      return new CompiledPattern(p, paramNames);
+    }
+
+    /**
+     * Attempts to match the path against this precompiled pattern.
+     *
+     * @return Result with matches and extracted params, or NO_MATCH.
+     */
+    public Result match(String path) {
+      Matcher matcher = pattern.matcher(path);
+      if (!matcher.matches()) {
+        return Result.NO_MATCH;
+      }
+
+      Map<String, String> params = new HashMap<>();
+      for (String name : paramNames) {
+        params.put(name, matcher.group(name));
+      }
+      return new Result(true, params);
     }
   }
 }

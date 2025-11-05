@@ -3,7 +3,8 @@ package org.nexus.middleware;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpMethod;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BiConsumer;
 import org.nexus.RequestContext;
 import org.nexus.interfaces.Middleware;
 import org.nexus.interfaces.MiddlewareChain;
@@ -14,40 +15,11 @@ public class LoggingMiddleware implements Middleware {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(LoggingMiddleware.class);
   private static final String REQUEST_ID_HEADER = "X-Request-ID";
+  private static final AtomicLong ID_COUNTER = new AtomicLong();  // Todo: change this to UUID
 
-  @Override
-  public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
-    logRequest(ctx);
-
-    ctx.addCompletionHandler((response, error) -> {
-      logResponse(ctx, error);
-    });
-
-    try {
-      chain.next(ctx);
-    } catch (Exception e) {
-      ctx.complete(null, e);
-      throw e;
-    }
-  }
-
-  private void logRequest(RequestContext ctx) {
-    FullHttpRequest request = ctx.getRequest();
-    String requestId = getOrGenerateRequestId(ctx);
-    String method = request.method().name();
-    String uri = request.uri();
-
-    LOGGER.debug("REQ {} {} [req_id={}]", method, uri, requestId);
-    LOGGER.debug("REQ HEADERS {}", request.headers());
-
-    if (request.method() != HttpMethod.GET && request.content() != null) {
-      LOGGER.debug("REQ body {} bytes", request.content().readableBytes());
-    }
-  }
-
-  private void logResponse(RequestContext ctx, Throwable error) {
+  private static void logResponse(RequestContext ctx, Throwable error) {
     long duration = ctx.getRequestDuration();
-    String requestId = getOrGenerateRequestId(ctx);
+    String requestId = ctx.getRequestHeaders().get(REQUEST_ID_HEADER);
     String method = ctx.getRequest().method().name();
     String uri = ctx.getRequest().uri();
 
@@ -66,42 +38,68 @@ public class LoggingMiddleware implements Middleware {
       return;
     }
 
-    LOGGER.debug("HEADERS {}", response.headers());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("HEADERS {}", response.headers());
+    }
 
     int statusCode = response.status().code();
     String logMsg = "{} {} -> {} [req_id={}, duration={}ms, size={}]";
+    int contentBytes = response.content().readableBytes();
 
     if (statusCode >= 500) {
-      LOGGER.error(logMsg, method, uri, statusCode, requestId, duration,
-          response.content().readableBytes());
-      return;
+      LOGGER.error(logMsg, method, uri, statusCode, requestId, duration, contentBytes);
+    } else if (statusCode >= 400) {
+      LOGGER.warn(logMsg, method, uri, statusCode, requestId, duration, contentBytes);
+    } else if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace(logMsg, method, uri, statusCode, requestId, duration, contentBytes);
     }
+  }
 
-    if (statusCode >= 400) {
-      LOGGER.warn(logMsg, method, uri, statusCode, requestId, duration,
-          response.content().readableBytes());
-      return;
+  @Override
+  public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
+    logRequest(ctx);
+
+    ctx.addCompletionHandler(new CompletionHandler(ctx));
+
+    chain.next(ctx);
+  }
+
+  private void logRequest(RequestContext ctx) {
+    FullHttpRequest request = ctx.getRequest();
+    String requestId = getOrGenerateRequestId(ctx);
+    String method = request.method().name();
+    String uri = request.uri();
+
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("REQ {} {} [req_id={}]", method, uri, requestId);
+      LOGGER.debug("REQ HEADERS {}", request.headers());
+      if (request.method() != HttpMethod.GET && request.content() != null) {
+        LOGGER.debug("REQ body {} bytes", request.content().readableBytes());
+      }
     }
-
-    LOGGER.info(logMsg, method, uri, statusCode, requestId, duration,
-        response.content().readableBytes());
   }
 
   private String getOrGenerateRequestId(RequestContext ctx) {
-    // First, check response headers (outgoing)
     String requestId = ctx.getRequestHeaders().get(REQUEST_ID_HEADER);
     if (requestId != null) {
       return requestId;
     }
 
-    // Then, check request headers (incoming)
     requestId = ctx.getRequest().headers().get(REQUEST_ID_HEADER);
     if (requestId == null) {
-      requestId = UUID.randomUUID().toString();
+      requestId = String.valueOf(ID_COUNTER.incrementAndGet());
     }
 
-    // Add to response headers only if not already present
     ctx.getRequestHeaders().add(REQUEST_ID_HEADER, requestId);
     return requestId;
+  }
+
+  private record CompletionHandler(RequestContext ctx) implements
+      BiConsumer<FullHttpResponse, Throwable> {
+
+    @Override
+    public void accept(FullHttpResponse response, Throwable error) {
+      logResponse(ctx, error);
+    }
   }
 }

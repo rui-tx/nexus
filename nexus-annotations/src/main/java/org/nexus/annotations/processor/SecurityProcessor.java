@@ -101,28 +101,52 @@ public final class SecurityProcessor extends AbstractProcessor {
       for (SecurityRule rule : rules) {
         String quotedRoles = toQuotedList(rule.requiredRoles());
         String quotedPermissions = toQuotedList(rule.requiredPermissions());
-        addsBuilder.append("""
-            RULES_BY_METHOD.computeIfAbsent("%s", k -> new ArrayList<>()).add(
-                new SecurityRule(
-                  "%s",
-                  "%s",
-                  "%s",
-                  "%s",
-                  %b,
-                  Set.of(%s),
-                  Set.of(%s)
-                )
-            );
+        String httpMethodUpper = rule.httpMethod().toUpperCase();
+        String endpoint = rule.endpoint();
+        boolean isDynamic = isDynamic(endpoint);
+
+        String ruleCreation = """
+            new SecurityRule(
+              "%s",
+              "%s",
+              "%s",
+              "%s",
+              %b,
+              Set.of(%s),
+              Set.of(%s)
+            )
             """.formatted(
-            rule.httpMethod().toUpperCase(),
             rule.className(),
             rule.methodName(),
             rule.httpMethod(),
-            rule.endpoint(),
+            endpoint,
             rule.permitAll(),
             quotedRoles.isEmpty() ? "" : quotedRoles,
             quotedPermissions.isEmpty() ? "" : quotedPermissions
-        ));
+        );
+
+        if (!isDynamic) {
+          addsBuilder.append("""
+              exactRules.put("%s " + PathMatcher.normalise("%s"), %s);
+              """.formatted(
+              httpMethodUpper,
+              endpoint,
+              ruleCreation.trim()
+          ));
+        } else {
+          addsBuilder.append("""
+              dynamicRulesByMethod.computeIfAbsent("%s", k -> new ArrayList<>()).add(
+                new CompiledSecurityRule(
+                  PathMatcher.CompiledPattern.compile("%s"),
+                  %s
+                )
+              );
+              """.formatted(
+              httpMethodUpper,
+              endpoint,
+              ruleCreation.trim()
+          ));
+        }
       }
 
       String generatedCode = """
@@ -130,27 +154,35 @@ public final class SecurityProcessor extends AbstractProcessor {
           
           import java.util.*;
           import org.nexus.PathMatcher;
+          import org.nexus.PathMatcher.CompiledPattern;
+          import org.nexus.PathMatcher.Result;
           import org.nexus.SecurityRule;
           
           public final class %s {
-            private static final Map<String, List<SecurityRule>> RULES_BY_METHOD = new HashMap<>();
+            private static final Map<String, SecurityRule> exactRules = new HashMap<>();
+            private static final Map<String, List<CompiledSecurityRule>> dynamicRulesByMethod = new HashMap<>();
+          
+            private record CompiledSecurityRule(CompiledPattern pattern, SecurityRule rule) {}
           
             static {
               %s
             }
           
             public static SecurityRule getRule(String httpMethod, String path) {
-              List<SecurityRule> candidates = RULES_BY_METHOD.get(httpMethod.toUpperCase());
+              String normPath = PathMatcher.normalise(path);
+              String key = httpMethod.toUpperCase() + " " + normPath;
+              SecurityRule exact = exactRules.get(key);
+              if (exact != null) {
+                return exact;
+              }
+              List<CompiledSecurityRule> candidates = dynamicRulesByMethod.get(httpMethod.toUpperCase());
               if (candidates == null) {
                 return null;
               }
-              for (SecurityRule rule : candidates) {
-                if (rule.endpoint().equals(path)) {
-                  return rule;
-                }
-                PathMatcher.Result result = PathMatcher.match(rule.endpoint(), path);
+              for (CompiledSecurityRule cr : candidates) {
+                Result result = cr.pattern.match(normPath);
                 if (result.matches()) {
-                  return rule;
+                  return cr.rule;
                 }
               }
               return null;
@@ -164,6 +196,10 @@ public final class SecurityProcessor extends AbstractProcessor {
 
       out.print(generatedCode);
     }
+  }
+
+  private boolean isDynamic(String endpoint) {
+    return endpoint.contains(":");
   }
 
   private String toQuotedList(Collection<String> items) {

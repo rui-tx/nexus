@@ -1,6 +1,5 @@
 package org.nexus.middleware;
 
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import org.nexus.RequestContext;
@@ -9,24 +8,19 @@ import org.nexus.interfaces.MiddlewareChain;
 
 public class DefaultMiddlewareChain implements MiddlewareChain {
 
-  private final Iterator<Middleware> iterator;
-  private final MiddlewareChain nextChain;
+  private final List<Middleware> middlewares;
+  private final Runnable finalAction;
+  private int index = 0;
 
-  private DefaultMiddlewareChain(Iterator<Middleware> iterator, Runnable finalAction) {
-    this.iterator = iterator;
-    this.nextChain = new MiddlewareChain() {
-      @Override
-      public void next(RequestContext ctx) {
-        finalAction.run();
-      }
-    };
+  private DefaultMiddlewareChain(List<Middleware> middlewares, Runnable finalAction) {
+    this.middlewares = middlewares;
+    this.finalAction = finalAction;
   }
 
   public static MiddlewareChain create(List<Middleware> middlewares, Runnable finalAction) {
     Objects.requireNonNull(middlewares, "middlewares cannot be null");
     Objects.requireNonNull(finalAction, "finalAction cannot be null");
-
-    return new DefaultMiddlewareChain(middlewares.iterator(), finalAction);
+    return new DefaultMiddlewareChain(middlewares, finalAction);
   }
 
   @Override
@@ -35,11 +29,16 @@ public class DefaultMiddlewareChain implements MiddlewareChain {
       throw new NullPointerException("RequestContext cannot be null");
     }
 
-    if (iterator.hasNext()) {
-      Middleware middleware = iterator.next();
+    if (index < middlewares.size()) {
+      Middleware middleware = middlewares.get(index);
+      index++;
       middleware.handle(ctx, this);
     } else {
-      nextChain.next(ctx);
+      executeFinalAction();
     }
+  }
+
+  private void executeFinalAction() {
+    finalAction.run();
   }
 }

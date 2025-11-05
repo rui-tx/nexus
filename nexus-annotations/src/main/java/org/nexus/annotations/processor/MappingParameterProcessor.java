@@ -3,7 +3,6 @@ package org.nexus.annotations.processor;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic.Kind;
 import org.nexus.annotations.QueryParam;
@@ -17,15 +16,15 @@ final class MappingParameterProcessor {
   private final StringBuilder invokeArgs = new StringBuilder();
   private final List<String> placeholders;
   private final String endpoint;
-  private final ExecutableElement method;
+  //private final ExecutableElement method;
   private int placeholderIndex = 0;
 
   MappingParameterProcessor(ProcessingEnvironment processingEnv,
-      ExecutableElement method,
+//      ExecutableElement method,
       List<String> placeholders,
       String endpoint) {
     this.processingEnv = processingEnv;
-    this.method = method;
+    //this.method = method;
     this.placeholders = placeholders;
     this.endpoint = endpoint;
   }
@@ -105,7 +104,7 @@ final class MappingParameterProcessor {
         .append(paramType).append(" ").append(paramName).append(";\n")
         .append("        try {\n");
     paramCode.append("          ").append(paramName)
-        .append(" = MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);\n");
+        .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);\n");
     paramCode.append("        } catch (JsonProcessingException e) {\n");
     paramCode.append("          throw new ProblemDetailsException(\n");
     paramCode.append("            new ProblemDetails.Single(\n");

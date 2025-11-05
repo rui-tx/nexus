@@ -67,7 +67,7 @@ public class Response<T> {
         ApiResponse wrapper = new ApiResponse(statusCode, body);
         parsed = DF_MAPPER.writeValueAsString(wrapper);
       } else {
-        parsed = body != null ? body.toString() : "null";
+        parsed = body != null ? body.toString() : "";
       }
     } catch (JsonProcessingException e) {
       LOGGER.error("Serialization failed", e);
@@ -86,7 +86,7 @@ public class Response<T> {
     DefaultFullHttpResponse response = new DefaultFullHttpResponse(
         HttpVersion.HTTP_1_1,
         HttpResponseStatus.valueOf(!errorParsing ? statusCode : 500),
-        Unpooled.copiedBuffer(parsed, CharsetUtil.UTF_8)
+        body != null ? Unpooled.copiedBuffer(parsed, CharsetUtil.UTF_8) : Unpooled.EMPTY_BUFFER
     );
 
     response.headers().set(HttpHeaderNames.CONTENT_TYPE, contentType);

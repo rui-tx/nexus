@@ -1,6 +1,7 @@
 package org.nexus.middleware;
 
 import io.netty.handler.codec.http.FullHttpRequest;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import nexus.generated.GeneratedSecurityRules;
@@ -18,22 +19,18 @@ public class SecurityMiddleware implements Middleware {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SecurityMiddleware.class);
   private static final String AUTH_HEADER = "Authorization";
+  private static final Set<String> EMPTY_SET = Collections.emptySet();
 
   @Override
   public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
     FullHttpRequest request = ctx.getRequest();
     String method = request.method().name().toUpperCase();
-    String path = request.uri().split("\\?")[0];
+    String uri = request.uri();
+    int qIndex = uri.indexOf('?');
+    String path = (qIndex < 0) ? uri : uri.substring(0, qIndex);
 
     SecurityRule rule = GeneratedSecurityRules.getRule(method, path);
-
-    if (rule == null) {
-      // No security rule defined: assume public access
-      chain.next(ctx);
-      return;
-    }
-
-    if (rule.permitAll()) {
+    if (rule == null || rule.permitAll()) {
       chain.next(ctx);
       return;
     }
@@ -50,8 +47,7 @@ public class SecurityMiddleware implements Middleware {
       return;
     }
 
-    // add the logged user to context
-    // ctx.setAttribute("user", authResult.getUser());
+    // ctx.setAttribute("user", authResult.getUser());  // If needed
 
     chain.next(ctx);
   }
@@ -59,22 +55,21 @@ public class SecurityMiddleware implements Middleware {
   private AuthResult validateAuth(FullHttpRequest request, SecurityRule rule) {
     String authHeader = request.headers().get(AUTH_HEADER);
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-      return new AuthResult(false, null, Set.of(), Set.of());
+      return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
     }
 
     String token = authHeader.substring(7);
     if (!"valid".equals(token)) {
-      return new AuthResult(false, null, Set.of(), Set.of());
+      return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
     }
 
-    Set<String> userRoles = Set.of("admin");  // From token claims
+    Set<String> userRoles = Set.of("admin");  // Reuse if static
     Set<String> userPermissions = Set.of("read", "write");
 
     return new AuthResult(true, "user-id", userRoles, userPermissions);
   }
 
-  private void throwSecurityException(String title, String message, int status,
-      String path) {
+  private void throwSecurityException(String title, String message, int status, String path) {
     throw new ProblemDetailsException(
         new ProblemDetails.Single(
             ProblemDetailsTypes.SECURITY_ERROR,
@@ -97,17 +92,11 @@ public class SecurityMiddleware implements Middleware {
     }
 
     public boolean hasRequiredRoles(Set<String> requiredRoles) {
-      if (requiredRoles.isEmpty()) {
-        return true;
-      }
-      return roles.containsAll(requiredRoles);
+      return requiredRoles.isEmpty() || roles.containsAll(requiredRoles);
     }
 
     public boolean hasRequiredPermissions(Set<String> requiredPermissions) {
-      if (requiredPermissions.isEmpty()) {
-        return true;
-      }
-      return permissions.containsAll(requiredPermissions);
+      return requiredPermissions.isEmpty() || permissions.containsAll(requiredPermissions);
     }
   }
 }

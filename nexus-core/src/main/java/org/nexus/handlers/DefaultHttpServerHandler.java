@@ -18,7 +18,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
 import nexus.generated.GeneratedRoutes;
-import org.nexus.PathMatcher;
+import nexus.generated.GeneratedRoutes.RouteMatch;
 import org.nexus.RequestContext;
 import org.nexus.Response;
 import org.nexus.Route;
@@ -53,17 +53,21 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
     boolean keepAlive = HttpUtil.isKeepAlive(request);
     String method = request.method().name();
     String rawUri = request.uri();
-    String path = rawUri.split("\\?")[0];
-    QueryStringDecoder qsd = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
-    Map<String, List<String>> queryParams = qsd.parameters();
+    int qIndex = rawUri.indexOf('?');
+    String path = (qIndex < 0) ? rawUri : rawUri.substring(0, qIndex);
+    Map<String, List<String>> queryParams =
+        (qIndex < 0)
+            ? Map.of()
+            : new QueryStringDecoder(rawUri, CharsetUtil.UTF_8).parameters();
 
-    Route<?> route = findMatchingRoute(method, path);
-    if (route == null) {
+    RouteMatch match = GeneratedRoutes.findMatchingRoute(method, path);
+    if (match == null) {
       sendResponse(ctx, new Response<>(404, "Not Found"), keepAlive);
       return;
     }
 
-    Map<String, String> pathParams = extractPathParams(route, path);
+    Route<?> route = match.route();
+    Map<String, String> pathParams = match.params();
     RequestContext requestContext = new RequestContext(ctx, request, pathParams, queryParams);
     // Store the context in the channel's attributes, so we can use it in the sendResponse()
     ctx.channel().attr(REQUEST_CONTEXT_KEY).set(requestContext);
@@ -80,27 +84,6 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
     } catch (Exception e) {
       handleError(ctx, e, keepAlive);
     }
-  }
-
-  private Route<?> findMatchingRoute(String method, String path) {
-    Route<?> route = GeneratedRoutes.getRoute(method, path);
-    if (route != null) {
-      return route;
-    }
-
-    for (Route<?> candidate : GeneratedRoutes.getRoutes(method)) {
-      PathMatcher.Result r = PathMatcher.match(candidate.getPath(), path);
-      if (r.matches()) {
-        return candidate;
-      }
-    }
-
-    return null;
-  }
-
-  private Map<String, String> extractPathParams(Route<?> route, String path) {
-    PathMatcher.Result result = PathMatcher.match(route.getPath(), path);
-    return result.matches() ? result.params() : Map.of();
   }
 
   private void executeRoute(Route<?> route, RequestContext ctx, boolean keepAlive) {
