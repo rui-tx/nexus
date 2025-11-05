@@ -1,6 +1,7 @@
 package org.nexus;
 
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
@@ -14,9 +15,13 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
+import nexus.generated.GeneratedDIInitializer;
+import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
 import org.nexus.interfaces.Middleware;
+import org.nexus.middleware.LoggingMiddleware;
+import org.nexus.middleware.SecurityMiddleware;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,12 +83,17 @@ public class Main {
     EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
     List<Middleware> middlewares = List.of(
-        new LoggingMiddleware()
+        new LoggingMiddleware(),
+        new SecurityMiddleware()
     );
+
+    // Initialize dependency injection for controllers, services and repos
+    GeneratedDIInitializer.initialize();
 
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
         .channel(NioServerSocketChannel.class)
+        .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
         .option(ChannelOption.SO_BACKLOG, 1024)
         .option(ChannelOption.SO_REUSEADDR, true)
         .childOption(ChannelOption.TCP_NODELAY, true)

@@ -1,4 +1,4 @@
-package org.nexus;
+package org.nexus.handlers;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -13,21 +13,27 @@ import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
+import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
 import nexus.generated.GeneratedRoutes;
+import nexus.generated.GeneratedRoutes.RouteMatch;
+import org.nexus.RequestContext;
+import org.nexus.Response;
+import org.nexus.Route;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
 import org.nexus.interfaces.MiddlewareChain;
 import org.nexus.interfaces.ProblemDetails;
 import org.nexus.interfaces.ProblemDetails.Single;
+import org.nexus.middleware.DefaultMiddlewareChain;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
+public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DefaultHttpServerHandler.class);
   private static final AttributeKey<RequestContext> REQUEST_CONTEXT_KEY =
@@ -48,17 +54,21 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     boolean keepAlive = HttpUtil.isKeepAlive(request);
     String method = request.method().name();
     String rawUri = request.uri();
-    String path = rawUri.split("\\?")[0];
-    QueryStringDecoder qsd = new QueryStringDecoder(request.uri(), CharsetUtil.UTF_8);
-    Map<String, List<String>> queryParams = qsd.parameters();
+    int qIndex = rawUri.indexOf('?');
+    String path = (qIndex < 0) ? rawUri : rawUri.substring(0, qIndex);
+    Map<String, List<String>> queryParams =
+        (qIndex < 0)
+            ? Map.of()
+            : new QueryStringDecoder(rawUri, CharsetUtil.UTF_8).parameters();
 
-    Route<?> route = findMatchingRoute(method, path);
-    if (route == null) {
+    RouteMatch match = GeneratedRoutes.findMatchingRoute(method, path);
+    if (match == null) {
       sendResponse(ctx, new Response<>(404, "Not Found"), keepAlive);
       return;
     }
 
-    Map<String, String> pathParams = extractPathParams(route, path);
+    Route<?> route = match.route();
+    Map<String, String> pathParams = match.params();
     RequestContext requestContext = new RequestContext(ctx, request, pathParams, queryParams);
     // Store the context in the channel's attributes, so we can use it in the sendResponse()
     ctx.channel().attr(REQUEST_CONTEXT_KEY).set(requestContext);
@@ -77,27 +87,6 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     }
   }
 
-  private Route<?> findMatchingRoute(String method, String path) {
-    Route<?> route = GeneratedRoutes.getRoute(method, path);
-    if (route != null) {
-      return route;
-    }
-
-    for (Route<?> candidate : GeneratedRoutes.getRoutes(method)) {
-      PathMatcher.Result r = PathMatcher.match(candidate.getPath(), path);
-      if (r.matches()) {
-        return candidate;
-      }
-    }
-
-    return null;
-  }
-
-  private Map<String, String> extractPathParams(Route<?> route, String path) {
-    PathMatcher.Result result = PathMatcher.match(route.getPath(), path);
-    return result.matches() ? result.params() : Map.of();
-  }
-
   private void executeRoute(Route<?> route, RequestContext ctx, boolean keepAlive) {
     route.handle(ctx).whenComplete((response, error) -> {
       try {
@@ -114,11 +103,17 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
   }
 
   private void sendResponse(ChannelHandlerContext ctx, Response<?> response, boolean keepAlive) {
+    if (!ctx.channel().isActive()) {
+      LOGGER.debug("Channel closed, skipping response send");
+      return;
+    }
+
     FullHttpResponse httpResponse = response.toHttpResponse();
     RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
-    requestContext.setRequestDuration();
 
-    if (requestContext.getRequestHeaders() != null) {
+    if (requestContext != null && requestContext.getRequestHeaders() != null) {
+      requestContext.setRequestDuration();
+
       // Custom headers
       requestContext.getRequestHeaders().add(
           "X-Response-Time",
@@ -129,25 +124,26 @@ class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpObject> {
     }
 
     if (keepAlive) {
-      httpResponse.headers()
-          .set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+      httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+    } else {
+      httpResponse.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
     }
 
     HttpUtil.setContentLength(httpResponse, httpResponse.content().readableBytes());
 
     ChannelFuture future = ctx.writeAndFlush(httpResponse);
-
-    // Add a listener to trigger completion callbacks
     future.addListener(f -> {
-      // this is needed for 404, because it does not go through middleware
-      if (!f.isSuccess()) {
-        requestContext.complete(null, f.cause());
-        return;
+      if (requestContext != null) {
+        if (!f.isSuccess() && f.cause() instanceof ClosedChannelException) {
+          LOGGER.debug("Channel closed during write, ignoring", f.cause());
+        } else if (!f.isSuccess()) {
+
+          requestContext.complete(null, f.cause());  // Other errors
+        } else {
+          requestContext.complete(httpResponse, null);
+        }
       }
-
-      requestContext.complete(httpResponse, null);
     });
-
     if (!keepAlive) {
       future.addListener(ChannelFutureListener.CLOSE);
     }

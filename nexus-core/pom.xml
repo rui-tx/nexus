@@ -27,6 +27,11 @@
   <dependencies>
     <dependency>
       <groupId>org.nexus</groupId>
+      <artifactId>nexus-commons</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.nexus</groupId>
       <artifactId>nexus-api</artifactId>
     </dependency>
 
@@ -67,7 +72,7 @@
               <mainClass>org.nexus.Main</mainClass>
               <buildArgs>
                 <!-- default: -O2 fast build: -Ob compress: -Os -->
-                <buildArg>-Ob</buildArg>
+                <buildArg>-Os</buildArg>
                 <buildArg>-march=native</buildArg>
                 <buildArg>--no-fallback</buildArg>
                 <buildArg>--future-defaults=all</buildArg>

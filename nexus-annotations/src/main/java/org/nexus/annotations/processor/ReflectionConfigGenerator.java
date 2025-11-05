@@ -1,7 +1,7 @@
 package org.nexus.annotations.processor;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
+import static org.nexus.NexusUtils.MAPPER_REFLECTION_CFG;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.ArrayList;
@@ -38,7 +38,6 @@ final class ReflectionConfigGenerator {
   private final Elements elementUtils;
   private final Set<String> processedTypes = new HashSet<>();
   private final List<ReflectionEntry> entries = new ArrayList<>();
-  private final ObjectMapper objectMapper;
 
   ReflectionConfigGenerator(ProcessingEnvironment processingEnv) {
     //this.processingEnv = processingEnv;
@@ -46,8 +45,6 @@ final class ReflectionConfigGenerator {
     this.filer = processingEnv.getFiler();
     //this.typeUtils = processingEnv.getTypeUtils();
     this.elementUtils = processingEnv.getElementUtils();
-    this.objectMapper = new ObjectMapper();
-    this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
   }
 
   /**
@@ -298,7 +295,7 @@ final class ReflectionConfigGenerator {
     // Sort entries by name for consistent output
     entries.sort(Comparator.comparing(e -> e.name));
 
-    String json = objectMapper.writeValueAsString(entries);
+    String json = MAPPER_REFLECTION_CFG.writeValueAsString(entries);
 
     try {
       FileObject resource = filer.createResource(

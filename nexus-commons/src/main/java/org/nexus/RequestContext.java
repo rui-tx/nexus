@@ -18,15 +18,17 @@ import org.slf4j.LoggerFactory;
 public final class RequestContext {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(RequestContext.class);
+
   private final ChannelHandlerContext nettyCtx;
   private final FullHttpRequest request;
   private final Map<String, String> pathParams;
   private final Map<String, List<String>> queryParams;
   private final String body;
-  private final Map<String, Object> attributes = new HashMap<>();
   private final long startTime = System.currentTimeMillis();
-  private final List<BiConsumer<FullHttpResponse, Throwable>> completionHandlers = new ArrayList<>();
-  private final HttpHeaders responseHeaders;
+  private Map<String, Object> attributes;
+  private BiConsumer<FullHttpResponse, Throwable> completionHandler;  // slot for completion handler
+  private List<BiConsumer<FullHttpResponse, Throwable>> extraHandlers;  // more than 1 (rare)
+  private HttpHeaders responseHeaders;
   private long endTime = System.currentTimeMillis();
   private FullHttpResponse response;
   private boolean responseCompleted = false;
@@ -42,7 +44,6 @@ public final class RequestContext {
     this.pathParams = Objects.requireNonNull(pathParams, "pathParams cannot be null");
     this.queryParams = Objects.requireNonNull(queryParams, "queryParams cannot be null");
     this.body = request.content() != null ? request.content().toString(CharsetUtil.UTF_8) : "";
-    this.responseHeaders = new DefaultHttpHeaders();
   }
 
   // Getters
@@ -55,6 +56,9 @@ public final class RequestContext {
   }
 
   public HttpHeaders getRequestHeaders() {
+    if (responseHeaders == null) {
+      responseHeaders = new DefaultHttpHeaders();
+    }
     return responseHeaders;
   }
 
@@ -87,21 +91,24 @@ public final class RequestContext {
     this.response = response;
   }
 
-  public void setAttribute(String key, Object value) {
-    attributes.put(key, value);
-  }
-
   @SuppressWarnings("unchecked")
   public <T> T getAttribute(String key) {
-    return (T) attributes.get(key);
+    return attributes != null ? (T) attributes.get(key) : null;
   }
 
-  public void setRequestDuration() {
-    endTime = System.currentTimeMillis() - startTime;
+  public void setAttribute(String key, Object value) {
+    if (attributes == null) {
+      attributes = new HashMap<>(4);
+    }
+    attributes.put(key, value);
   }
 
   public long getRequestDuration() {
     return endTime;
+  }
+
+  public void setRequestDuration() {
+    endTime = System.currentTimeMillis() - startTime;
   }
 
   public void addCompletionHandler(BiConsumer<FullHttpResponse, Throwable> handler) {
@@ -109,8 +116,15 @@ public final class RequestContext {
       LOGGER.debug("Completion handler called immediately");
       handler.accept(response, null);
     } else {
-      LOGGER.debug("Adding completion handler (total: {})", completionHandlers.size() + 1);
-      completionHandlers.add(handler);
+      LOGGER.debug("Adding completion handler");
+      if (completionHandler == null) {
+        completionHandler = handler;
+      } else {
+        if (extraHandlers == null) {
+          extraHandlers = new ArrayList<>(2);
+        }
+        extraHandlers.add(handler);
+      }
     }
   }
 
@@ -127,14 +141,23 @@ public final class RequestContext {
     this.response = response;
     this.responseCompleted = true;
 
-    for (BiConsumer<FullHttpResponse, Throwable> handler : completionHandlers) {
+    if (completionHandler != null) {
       try {
-        LOGGER.debug("Calling completion handler");
-        handler.accept(response, error);
+        completionHandler.accept(response, error);
       } catch (Exception e) {
-        LOGGER.error("Error in completion handler", e);
+        LOGGER.error("Error in completion handler1", e);
       }
     }
-    completionHandlers.clear();
+
+    if (extraHandlers != null) {
+      for (BiConsumer<FullHttpResponse, Throwable> handler : extraHandlers) {
+        try {
+          handler.accept(response, error);
+        } catch (Exception e) {
+          LOGGER.error("Error in extra completion handler", e);
+        }
+      }
+      extraHandlers.clear();
+    }
   }
 }

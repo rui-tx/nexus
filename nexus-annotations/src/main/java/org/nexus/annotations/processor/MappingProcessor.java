@@ -27,7 +27,7 @@ import org.nexus.annotations.RequestBody;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Mapping")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
-public class MappingProcessor extends AbstractProcessor {
+public final class MappingProcessor extends AbstractProcessor {
 
   private Filer filer;
   private Messager messager;
@@ -68,7 +68,7 @@ public class MappingProcessor extends AbstractProcessor {
     Map<String, String> routeKeys = new HashMap<>();
     List<RouteInfo> routes = new ArrayList<>();
 
-    // First pass: validate all methods and collect route information + reflection types
+    // First pass: validate all methods and collect route information plus reflection types
     for (Element element : elements) {
       if (element.getKind() != ElementKind.METHOD) {
         messager.printMessage(
@@ -160,13 +160,13 @@ public class MappingProcessor extends AbstractProcessor {
     String className = ((TypeElement) method.getEnclosingElement()).getQualifiedName().toString();
     String methodName = method.getSimpleName().toString();
     String endpoint = route.mapping.endpoint();
-    String httpMethod = "HttpMethod." + route.mapping.type();
-    String routeKey = "\"" + route.mapping.type().name() + " " + endpoint + "\"";
+    String httpMethod = "HttpMethod." + route.mapping.type().name();
+    String methodStr = route.mapping.type().name();
 
-    // Process parameters
+    // Process parameters (unchanged)
     List<String> placeholders = MappingProcessorUtils.extractPlaceholders(endpoint);
     MappingParameterProcessor paramProcessor = new MappingParameterProcessor(
-        processingEnv, method, placeholders, endpoint);
+        processingEnv, placeholders, endpoint); //method
 
     List<? extends VariableElement> parameters = method.getParameters();
     for (int i = 0; i < parameters.size(); i++) {
@@ -175,31 +175,29 @@ public class MappingProcessor extends AbstractProcessor {
 
     String paramCode = paramProcessor.getParamCode();
     String invokeArgs = paramProcessor.getInvokeArgs();
+    String responseType = MappingProcessorUtils.getResponseGenericType(method);
 
-    // Build the route mapping
-    return String.format("""
-                routeMap.put(
-                  %s,
-                  new Route<%s>(%s, "%s", rc -> {
-                    %s
-                    %s controller = new %s();
-                    try {
-                      return controller.%s(%s);
-                    } catch (Exception e) {
-                      return CompletableFuture.failedFuture(e);
-                    }
-                  }));
-            """,
-        routeKey,
-        MappingProcessorUtils.getResponseGenericType(method),
-        httpMethod,
-        endpoint,
-        paramCode.isEmpty() ? "" : paramCode + "\n      ",
-        className,
-        className,
-        methodName,
-        invokeArgs
+    boolean isExact = placeholders.isEmpty();
+
+    String routeCreation = String.format(
+        "new Route<%s>(%s, \"%s\", rc -> {\n  %s\n  %s controller = org.nexus.NexusDIRegistry.getInstance().get(%s.class);\n  try {\n    return controller.%s(%s);\n  } catch (Exception e) {\n    return CompletableFuture.failedFuture(e);\n  }\n})",
+        responseType, httpMethod, endpoint, paramCode.isEmpty() ? "" : paramCode, className,
+        className, methodName, invokeArgs
     );
+
+    if (isExact) {
+      // Exact route: Use normalized key for put
+      return String.format(
+          "exactRoutes.put(\"%s \" + PathMatcher.normalise(\"%s\"), %s);\n",
+          methodStr, endpoint, routeCreation
+      );
+    } else {
+      // Dynamic route: Precompile and add to list
+      return String.format(
+          "dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>()).add(\n  new CompiledRoute(\n    CompiledPattern.compile(\"%s\"),\n    %s\n  )\n);\n",
+          methodStr, endpoint, routeCreation
+      );
+    }
   }
 
   private void writeGeneratedFile(String content) throws Exception {

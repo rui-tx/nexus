@@ -5,7 +5,6 @@ import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
@@ -16,11 +15,12 @@ import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 import javax.tools.JavaFileObject;
 import org.nexus.SecurityRule;
+import org.nexus.annotations.Mapping;
 import org.nexus.annotations.Secured;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Secured")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
-public class SecurityProcessor extends AbstractProcessor {
+public final class SecurityProcessor extends AbstractProcessor {
 
   private static final String GENERATED_PACKAGE = "nexus.generated";
   private static final String CONFIG_CLASS = "GeneratedSecurityRules";
@@ -57,14 +57,32 @@ public class SecurityProcessor extends AbstractProcessor {
       return;
     }
 
+    Mapping mapping = element.getAnnotation(Mapping.class);
+    if (mapping == null) {
+      String className = ((TypeElement) element.getEnclosingElement()).getQualifiedName()
+          .toString();
+      String methodName = element.getSimpleName().toString();
+      processingEnv.getMessager().printMessage(
+          Diagnostic.Kind.ERROR,
+          "@Secured used without @Mapping on method: " + className + "." + methodName
+      );
+      return;
+    }
+
     // Get class and method names
     String className = ((TypeElement) element.getEnclosingElement()).getQualifiedName().toString();
     String methodName = element.getSimpleName().toString();
+
+    // Extract from Mapping
+    String httpMethod = mapping.type().name();
+    String endpoint = mapping.endpoint();
 
     // Create and add the security rule
     SecurityRule rule = new SecurityRule(
         className,
         methodName,
+        httpMethod,
+        endpoint,
         secured.permitAll(),
         Set.of(secured.value()),
         Set.of(secured.permissions())
@@ -78,50 +96,110 @@ public class SecurityProcessor extends AbstractProcessor {
         GENERATED_PACKAGE + "." + className);
 
     try (PrintWriter out = new PrintWriter(builderFile.openWriter())) {
+      // Collect generated add statements
+      StringBuilder addsBuilder = new StringBuilder();
+      for (SecurityRule rule : rules) {
+        String quotedRoles = toQuotedList(rule.requiredRoles());
+        String quotedPermissions = toQuotedList(rule.requiredPermissions());
+        String httpMethodUpper = rule.httpMethod().toUpperCase();
+        String endpoint = rule.endpoint();
+        boolean isDynamic = isDynamic(endpoint);
+
+        String ruleCreation = """
+            new SecurityRule(
+              "%s",
+              "%s",
+              "%s",
+              "%s",
+              %b,
+              Set.of(%s),
+              Set.of(%s)
+            )
+            """.formatted(
+            rule.className(),
+            rule.methodName(),
+            rule.httpMethod(),
+            endpoint,
+            rule.permitAll(),
+            quotedRoles.isEmpty() ? "" : quotedRoles,
+            quotedPermissions.isEmpty() ? "" : quotedPermissions
+        );
+
+        if (!isDynamic) {
+          addsBuilder.append("""
+              exactRules.put("%s " + PathMatcher.normalise("%s"), %s);
+              """.formatted(
+              httpMethodUpper,
+              endpoint,
+              ruleCreation.trim()
+          ));
+        } else {
+          addsBuilder.append("""
+              dynamicRulesByMethod.computeIfAbsent("%s", k -> new ArrayList<>()).add(
+                new CompiledSecurityRule(
+                  PathMatcher.CompiledPattern.compile("%s"),
+                  %s
+                )
+              );
+              """.formatted(
+              httpMethodUpper,
+              endpoint,
+              ruleCreation.trim()
+          ));
+        }
+      }
+
       String generatedCode = """
           package %s;
           
           import java.util.*;
+          import org.nexus.PathMatcher;
+          import org.nexus.PathMatcher.CompiledPattern;
+          import org.nexus.PathMatcher.Result;
           import org.nexus.SecurityRule;
           
           public final class %s {
-            private static final Map<String, SecurityRule> RULES = new HashMap<>();
+            private static final Map<String, SecurityRule> exactRules = new HashMap<>();
+            private static final Map<String, List<CompiledSecurityRule>> dynamicRulesByMethod = new HashMap<>();
+          
+            private record CompiledSecurityRule(CompiledPattern pattern, SecurityRule rule) {}
           
             static {
-          %s
+              %s
             }
           
-              public static SecurityRule getRule(String httpMethod, String path) {
-                  return RULES.get(SecurityRule.createKey(httpMethod, path));
+            public static SecurityRule getRule(String httpMethod, String path) {
+              String normPath = PathMatcher.normalise(path);
+              String key = httpMethod.toUpperCase() + " " + normPath;
+              SecurityRule exact = exactRules.get(key);
+              if (exact != null) {
+                return exact;
               }
+              List<CompiledSecurityRule> candidates = dynamicRulesByMethod.get(httpMethod.toUpperCase());
+              if (candidates == null) {
+                return null;
+              }
+              for (CompiledSecurityRule cr : candidates) {
+                Result result = cr.pattern.match(normPath);
+                if (result.matches()) {
+                  return cr.rule;
+                }
+              }
+              return null;
+            }
           }
           """.formatted(
           GENERATED_PACKAGE,
           className,
-          rules.stream()
-              .map(rule -> """
-                       RULES.put(
-                         "%s",
-                         new SecurityRule(
-                           "%s",
-                           "%s",
-                           %b,
-                           Set.of(%s),
-                           Set.of(%s)
-                         ));
-                  """.formatted(
-                  SecurityRule.createKey(rule.className(), rule.methodName()),
-                  rule.className(),
-                  rule.methodName(),
-                  rule.permitAll(),
-                  toQuotedList(rule.requiredRoles()),
-                  toQuotedList(rule.requiredPermissions())
-              ))
-              .collect(Collectors.joining())
+          addsBuilder.toString()
       );
 
       out.print(generatedCode);
     }
+  }
+
+  private boolean isDynamic(String endpoint) {
+    return endpoint.contains(":");
   }
 
   private String toQuotedList(Collection<String> items) {

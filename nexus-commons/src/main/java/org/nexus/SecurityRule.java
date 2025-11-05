@@ -5,6 +5,8 @@ import java.util.Set;
 public record SecurityRule(
     String className,
     String methodName,
+    String httpMethod,
+    String endpoint,
     boolean permitAll,
     Set<String> requiredRoles,
     Set<String> requiredPermissions
