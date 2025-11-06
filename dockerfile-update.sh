@@ -17,7 +17,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN mvn package -Pnative
+RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 

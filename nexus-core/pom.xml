@@ -80,6 +80,7 @@
 <!--                <buildArg>&#45;&#45;enable-sbom=export</buildArg>-->
 <!--                <buildArg>&#45;&#45;emit build-report</buildArg>-->
                 <buildArg>-H:+UnlockExperimentalVMOptions</buildArg>
+                <buildArg>-H:+SharedArenaSupport</buildArg>
                 <buildArg>-H:Path=${project.build.directory}/native</buildArg>
                 <buildArg>-H:Name=nexus-${revision}</buildArg>
 <!--                <buildArg>-H:AdvancedObfuscation=</buildArg>-->

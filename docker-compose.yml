@@ -8,3 +8,15 @@ services:
       - "15000:15000"
     command: [ "-p", "15000" ]
     restart: unless-stopped
+
+  database:
+    image: "postgres:18.0"
+    container_name: nexus-db
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: username
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: nexus-db
+    volumes:
+      - .db/postgres/:/var/lib/postgresql/

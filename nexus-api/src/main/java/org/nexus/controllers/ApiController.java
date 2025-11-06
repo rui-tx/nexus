@@ -8,6 +8,7 @@ import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
 import org.nexus.annotations.Secured;
 import org.nexus.dto.PostRequest;
+import org.nexus.dto.TestDto;
 import org.nexus.dto.Todo;
 import org.nexus.dto.UserDto;
 import org.nexus.enums.HttpMethod;
@@ -25,6 +26,12 @@ public class ApiController {
 
   public ApiController(ApiService apiService) {
     this.apiService = apiService;
+  }
+
+  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/db/:name")
+  public CompletableFuture<Response<List<TestDto>>> db(String name) {
+    return apiService.db(name)
+        .thenApply(data -> new Response<>(200, data));
   }
 
   @Secured(permitAll = true)

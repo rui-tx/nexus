@@ -16,14 +16,16 @@ import java.util.concurrent.CompletableFuture;
 import org.nexus.CachedHttpResponse;
 import org.nexus.NexusExecutor;
 import org.nexus.NexusHttpClient;
+import org.nexus.NexusStaticResponseRegistry;
 import org.nexus.Response;
-import org.nexus.StaticResponseRegistry;
 import org.nexus.annotations.Service;
 import org.nexus.dto.PostRequest;
+import org.nexus.dto.TestDto;
 import org.nexus.dto.Todo;
 import org.nexus.dto.UserDto;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
+import org.nexus.interfaces.ProblemDetails;
 import org.nexus.interfaces.ProblemDetails.Single;
 import org.nexus.repositories.ApiRepository;
 import org.slf4j.Logger;
@@ -36,7 +38,7 @@ public class ApiService {
 
   // pre computed responses
   static {
-    StaticResponseRegistry.register("heartbeat", "up", 200);
+    NexusStaticResponseRegistry.register("heartbeat", "up", 200);
   }
 
   private final ApiRepository apiRepository;
@@ -46,7 +48,7 @@ public class ApiService {
   }
 
   public CompletableFuture<Response<String>> pong() {
-    FullHttpResponse preComputed = StaticResponseRegistry.get("heartbeat");
+    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("heartbeat");
     return CompletableFuture.completedFuture(new CachedHttpResponse(preComputed));
   }
 
@@ -54,6 +56,25 @@ public class ApiService {
     return CompletableFuture.supplyAsync(
         () -> new Response<>(200, "%d: %s %s".formatted(id, request.foo(), request.bar())),
         NexusExecutor.INSTANCE.get());
+  }
+
+  public CompletableFuture<List<TestDto>> db(String name) {
+    return apiRepository.getData(name)
+        .thenApply(rs ->
+            rs.stream()
+                .map(t -> new TestDto(t.name()))
+                .toList())
+        .exceptionally(ex -> {
+          ProblemDetails error = new ProblemDetails.Single(
+              ProblemDetailsTypes.SERVER_ERROR,
+              "/db-problems",
+              500,
+              "An unexpected error occurred when using the db",
+              "/db",
+              Map.of("exception", Objects.toString(ex.getMessage(), ex.getClass().getSimpleName()))
+          );
+          throw new ProblemDetailsException(error);
+        });
   }
 
   public CompletableFuture<Response<List<Todo>>> externalCall() {
