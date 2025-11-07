@@ -1,15 +1,15 @@
 services:
-  #  nexus:
-  #    build:
-  #      context: .
-  #      dockerfile: Dockerfile
-  #    container_name: nexus-server
-  #    ports:
-  #      - "15000:15000"
-  #    restart: unless-stopped
-  #    depends_on:
-  #      database:
-  #        condition: service_healthy
+  nexus:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nexus-server
+    ports:
+      - "15000:15000"
+    restart: unless-stopped
+    depends_on:
+      database:
+        condition: service_healthy
 
   database:
     image: "postgres:18.0"
