@@ -8,6 +8,7 @@ import java.sql.SQLException;
 import java.util.Objects;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
+import org.nexus.config.DatabaseConfig;
 
 /**
  * SQLite connector using HikariCP connection pool.
@@ -16,19 +17,31 @@ public class SqliteConnector implements DatabaseConnector {
 
   private final HikariDataSource dataSource;
   private final boolean isReady;
+  private final DatabaseConfig config;
 
   /**
    * Create a new SQLite connector.
    *
-   * @param databasePath Path to the SQLite database file
-   * @param readOnly     Whether to open the database in read-only mode
-   * @param poolSize     Maximum number of connections in the pool
+   * @param config The database configuration
    */
-  public SqliteConnector(String databasePath, boolean readOnly, int poolSize) {
-    Objects.requireNonNull(databasePath, "Database path cannot be null");
+  public SqliteConnector(DatabaseConfig config) {
+    this(config, false);
+  }
 
+  /**
+   * Create a new SQLite connector with read-only option.
+   *
+   * @param config The database configuration
+   * @param readOnly Whether to open the database in read-only mode
+   */
+  public SqliteConnector(DatabaseConfig config, boolean readOnly) {
+    Objects.requireNonNull(config, "Database config cannot be null");
+    this.config = config;
+    
     try {
+      String databasePath = config.url().replaceFirst("^jdbc:sqlite:", "");
       File dbFile = new File(databasePath);
+      
       if (!readOnly && !dbFile.exists()) {
         // Create parent directories if they don't exist
         File parent = dbFile.getParentFile();
@@ -43,25 +56,25 @@ public class SqliteConnector implements DatabaseConnector {
         }
       }
 
-      HikariConfig config = new HikariConfig();
-      String url = String.format("jdbc:sqlite:%s%s",
-          databasePath,
-          readOnly ? "?mode=ro" : "");
+      HikariConfig hikariConfig = new HikariConfig();
+      String url = config.url() + (readOnly ? "?mode=ro" : "");
 
-      config.setJdbcUrl(url);
-      config.setMaximumPoolSize(poolSize);
-      config.setMinimumIdle(1);
-      config.setPoolName("sqlite-" + (readOnly ? "reader" : "writer") + "-pool");
+      hikariConfig.setJdbcUrl(url);
+      hikariConfig.setMaximumPoolSize(config.poolSize());
+      hikariConfig.setMinimumIdle(1);
+      hikariConfig.setPoolName("sqlite-" + config.name() + (readOnly ? "-ro" : "-rw") + "-pool");
+      hikariConfig.setAutoCommit(config.autoCommit());
+      hikariConfig.setConnectionTimeout(config.connectionTimeout());
 
       // SQLite-specific optimizations
-      config.addDataSourceProperty("journal_mode", "WAL");
-      config.addDataSourceProperty("synchronous", "NORMAL");
-      config.addDataSourceProperty("busy_timeout", 30000); // 30 seconds
+      hikariConfig.addDataSourceProperty("journal_mode", "WAL");
+      hikariConfig.addDataSourceProperty("synchronous", "NORMAL");
+      hikariConfig.addDataSourceProperty("busy_timeout", 30000); // 30 seconds
 
-      this.dataSource = new HikariDataSource(config);
+      this.dataSource = new HikariDataSource(hikariConfig);
       this.isReady = true;
 
-      // Test the connection
+      // Test the connection and enable foreign keys
       try (Connection conn = dataSource.getConnection()) {
         try (var stmt = conn.createStatement()) {
           stmt.execute("PRAGMA foreign_keys = ON");

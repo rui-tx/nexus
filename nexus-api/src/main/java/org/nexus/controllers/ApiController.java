@@ -29,8 +29,14 @@ public class ApiController {
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/db/:name")
-  public CompletableFuture<Response<List<TestDto>>> db(String name) {
+  public CompletableFuture<Response<TestDto>> db(String name) {
     return apiService.db(name)
+        .thenApply(data -> new Response<>(200, data));
+  }
+
+  @Mapping(type = HttpMethod.GET, endpoint = ENDPOINT + "/db-select/:name")
+  public CompletableFuture<Response<TestDto>> dbSelect(String name) {
+    return apiService.dbSelect(name)
         .thenApply(data -> new Response<>(200, data));
   }
 
@@ -57,4 +63,5 @@ public class ApiController {
   public CompletableFuture<Response<UserDto>> getUser() {
     return apiService.getUser();
   }
+
 }

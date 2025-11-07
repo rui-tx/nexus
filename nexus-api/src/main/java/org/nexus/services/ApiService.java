@@ -58,13 +58,30 @@ public class ApiService {
         NexusExecutor.INSTANCE.get());
   }
 
-  public CompletableFuture<List<TestDto>> db(String name) {
-    return apiRepository.getData(name)
-        .thenApply(rs ->
-            rs.stream()
-                .map(t -> new TestDto(t.name()))
-                .toList())
+  public CompletableFuture<TestDto> dbSelect(String name) {
+    return apiRepository.getDataSelect(name)
+        .thenApply(rs -> new TestDto("Found %s entries".formatted(rs.size())))
         .exceptionally(ex -> {
+          LOGGER.error(ex.getMessage(), ex);
+          ProblemDetails error = new ProblemDetails.Single(
+              ProblemDetailsTypes.SERVER_ERROR,
+              "/db-problems",
+              500,
+              "An unexpected error occurred when using the db",
+              "/db",
+              Map.of("exception", Objects.toString(ex.getMessage(), ex.getClass().getSimpleName()))
+          );
+          throw new ProblemDetailsException(error);
+        });
+  }
+
+  public CompletableFuture<TestDto> db(String name) {
+    return apiRepository.getData(name)
+        .thenApply(
+            rs -> new TestDto("Success. %s has %s entries".formatted(name, rs.size()))
+        )
+        .exceptionally(ex -> {
+          LOGGER.error(ex.getMessage(), ex);
           ProblemDetails error = new ProblemDetails.Single(
               ProblemDetailsTypes.SERVER_ERROR,
               "/db-problems",

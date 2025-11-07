@@ -5,6 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
 
@@ -15,45 +16,37 @@ public class PostgresConnector implements DatabaseConnector {
 
   private final HikariDataSource dataSource;
   private final boolean isReady;
+  private final DatabaseConfig config;
 
   /**
-   * Create a new PostgreSQL connector.
+   * Create a new PostgreSQL connector using the provided configuration.
    *
-   * @param host     The database host (e.g., "localhost")
-   * @param port     The database port (e.g., 5432)
-   * @param dbName   The database name
-   * @param username The database username
-   * @param password The database password
-   * @param poolSize Maximum number of connections in the pool
+   * @param config The database configuration
    */
-  public PostgresConnector(
-      String host, int port, String dbName, String username, String password, int poolSize) {
-    Objects.requireNonNull(host, "Host cannot be null");
-    Objects.requireNonNull(dbName, "Database name cannot be null");
-    Objects.requireNonNull(username, "Username cannot be null");
-    Objects.requireNonNull(password, "Password cannot be null");
+  public PostgresConnector(DatabaseConfig config) {
+    this.config = Objects.requireNonNull(config, "Database config cannot be null");
 
     try {
-      HikariConfig config = new HikariConfig();
-      String url = String.format("jdbc:postgresql://%s:%d/%s", host, port, dbName);
-
-      config.setJdbcUrl(url);
-      config.setUsername(username);
-      config.setPassword(password);
-      config.setMaximumPoolSize(poolSize);
-      config.setMinimumIdle(1);
-      config.setPoolName("postgres-pool");
+      HikariConfig hikariConfig = new HikariConfig();
+      
+      hikariConfig.setJdbcUrl(config.url());
+      hikariConfig.setUsername(config.username());
+      hikariConfig.setPassword(config.password());
+      hikariConfig.setMaximumPoolSize(config.poolSize());
+      hikariConfig.setMinimumIdle(1);
+      hikariConfig.setPoolName("postgres-" + config.name() + "-pool");
+      hikariConfig.setAutoCommit(config.autoCommit());
+      hikariConfig.setConnectionTimeout(config.connectionTimeout());
 
       // PostgreSQL-specific optimizations
-      config.setConnectionTimeout(30000); // 30 seconds
-      config.addDataSourceProperty("tcpKeepAlive", "true");
-      config.addDataSourceProperty("loginTimeout", "30");
+      hikariConfig.addDataSourceProperty("tcpKeepAlive", "true");
+      hikariConfig.addDataSourceProperty("loginTimeout", "30");
 
       // Optional: Enable SSL if your setup requires it
-      // config.addDataSourceProperty("ssl", "true");
-      // config.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory"); // For dev/testing only
+      // hikariConfig.addDataSourceProperty("ssl", "true");
+      // hikariConfig.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
 
-      this.dataSource = new HikariDataSource(config);
+      this.dataSource = new HikariDataSource(hikariConfig);
       this.isReady = true;
 
       // Test the connection

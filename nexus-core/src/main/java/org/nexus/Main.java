@@ -16,6 +16,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
 import nexus.generated.GeneratedDIInitializer;
+import org.nexus.config.EnvConfig;
+import org.nexus.dbConnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
@@ -33,28 +35,24 @@ public class Main {
   private EventLoopGroup workerGroup;
   private Channel serverChannel;
 
-  // cli entry
   static void main(String[] args) throws Exception {
-    int port = 15000;
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      LOGGER.info("Shutdown, performing cleanup...");
+      Main app = new Main();
+      app.stop();
+      LOGGER.info("Done. Bye!");
+    }));
 
-    for (int i = 0; i < args.length; i++) {
-      switch (args[i]) {
+    int port = EnvConfig.getInt("SERVER_PORT", 15001);
+
+    for (String arg : args) {
+      switch (arg) {
         case "--help":
         case "-h":
           printHelp();
           System.exit(0);
-        case "--port":
-        case "-p":
-          if (i + 1 < args.length) {
-            port = Integer.parseInt(args[++i]);
-          } else {
-            System.err.println("Missing value for port");
-            printHelp();
-            System.exit(1);
-          }
-          break;
         default:
-          System.err.printf("Unknown argument: %s%n", args[i]);
+          System.err.printf("Unknown argument: %s%n", arg);
           printHelp();
           System.exit(1);
       }
@@ -70,7 +68,6 @@ public class Main {
     String help = """
         nexus - Netty-based web server
         Usage: nexus [options]
-          -p, --port <port>     Server port
           -h, --help            Prints this help
         
         For more information, read the documentation in the repository
@@ -130,10 +127,14 @@ public class Main {
   }
 
   public void stop() {
+
+    // Close server channel
     if (serverChannel != null) {
       serverChannel.close().awaitUninterruptibly();
       serverChannel = null;
     }
+
+    // Shutdown worker groups
     if (bossGroup != null) {
       bossGroup.shutdownGracefully().awaitUninterruptibly();
       bossGroup = null;
@@ -141,6 +142,12 @@ public class Main {
     if (workerGroup != null) {
       workerGroup.shutdownGracefully().awaitUninterruptibly();
       workerGroup = null;
+    }
+
+    try {
+      DatabaseConnectorFactory.closeAll();
+    } catch (Exception e) {
+      LOGGER.error("Error closing database connections", e);
     }
   }
 }
