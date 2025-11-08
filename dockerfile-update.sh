@@ -26,7 +26,7 @@ COPY nexus-api/pom.xml nexus-api/
 COPY nexus-core/pom.xml nexus-core/
 
 # download dependencies, this layer will be cached
-RUN mvn dependency:go-offline -B
+RUN mvn compile -B
 
 # copy the rest of the source code
 COPY . .
