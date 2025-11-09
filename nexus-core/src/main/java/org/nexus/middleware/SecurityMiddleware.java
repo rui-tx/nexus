@@ -1,12 +1,15 @@
 package org.nexus.middleware;
 
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import nexus.generated.GeneratedSecurityRules;
 import org.nexus.RequestContext;
 import org.nexus.SecurityRule;
+import org.nexus.config.AppConfig;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
@@ -15,11 +18,50 @@ import org.nexus.interfaces.ProblemDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Middleware that handles security-related concerns including authentication, authorization,
+ * and security headers. This middleware should be one of the first in the chain to ensure
+ * security policies are applied to all requests.
+ */
 public class SecurityMiddleware implements Middleware {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SecurityMiddleware.class);
   private static final String AUTH_HEADER = "Authorization";
   private static final Set<String> EMPTY_SET = Collections.emptySet();
+  private final boolean enforceHsts;
+  private final boolean isHttps;
+
+  /**
+   * Creates a new SecurityMiddleware with default settings.
+   * HSTS will be enabled if the server is running with HTTPS.
+   */
+  public SecurityMiddleware() {
+    this(AppConfig.getInstance().getBoolean("SSL_ENABLED", false));
+  }
+
+  /**
+   * Creates a new SecurityMiddleware with custom settings.
+   *
+   * @param isHttps Whether the server is running with HTTPS
+   */
+  public SecurityMiddleware(boolean isHttps) {
+    this(isHttps, isHttps); // Enable HSTS by default when using HTTPS
+  }
+
+  /**
+   * Creates a new SecurityMiddleware with custom settings.
+   *
+   * @param isHttps Whether the server is running with HTTPS
+   * @param enforceHsts Whether to enable HSTS (only applicable when isHttps is true)
+   */
+  public SecurityMiddleware(boolean isHttps, boolean enforceHsts) {
+    this.isHttps = isHttps;
+    this.enforceHsts = enforceHsts && isHttps; // HSTS only makes sense over HTTPS
+
+    if (this.enforceHsts) {
+      LOGGER.info("HSTS enabled - browsers will enforce HTTPS for 1 year");
+    }
+  }
 
   @Override
   public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
@@ -29,6 +71,10 @@ public class SecurityMiddleware implements Middleware {
     int qIndex = uri.indexOf('?');
     String path = (qIndex < 0) ? uri : uri.substring(0, qIndex);
 
+    // Apply security headers to all responses
+    applySecurityHeaders(ctx);
+
+    // Check authentication and authorization
     SecurityRule rule = GeneratedSecurityRules.getRule(method, path);
     if (rule == null || rule.permitAll()) {
       chain.next(ctx);
@@ -41,15 +87,67 @@ public class SecurityMiddleware implements Middleware {
       return;
     }
 
-    if (!authResult.hasRequiredRoles(rule.requiredRoles()) || !authResult.hasRequiredPermissions(
-        rule.requiredPermissions())) {
+    if (!authResult.hasRequiredRoles(rule.requiredRoles()) || 
+        !authResult.hasRequiredPermissions(rule.requiredPermissions())) {
       throwSecurityException("Forbidden", "Insufficient privileges", 403, path);
       return;
     }
 
-    // ctx.setAttribute("user", authResult.getUser());  // If needed
+    // Store user in context if needed
+    // ctx.setAttribute("user", authResult.getUser());
 
     chain.next(ctx);
+  }
+
+  /**
+   * Applies security headers to the response.
+   *
+   * @param ctx The request context
+   */
+  /**
+   * Applies security headers to the response.
+   *
+   * @param ctx The request context
+   */
+  private void applySecurityHeaders(RequestContext ctx) {
+    // Get or create response headers
+    HttpHeaders headers = ctx.getRequestHeaders();
+    if (headers == null) {
+      headers = new DefaultHttpHeaders();
+    }
+
+    // HSTS - only send over HTTPS
+    if (enforceHsts) {
+      headers.add(
+          "Strict-Transport-Security",
+          "max-age=31536000; includeSubDomains" // 1 year, include subdomains
+      );
+    }
+
+    // Prevent MIME type sniffing
+    headers.add("X-Content-Type-Options", "nosniff");
+
+    // Prevent clickjacking
+    headers.add("X-Frame-Options", "DENY");
+
+    // XSS protection (legacy, but doesn't hurt)
+    headers.add("X-XSS-Protection", "1; mode=block");
+
+    // Content Security Policy - adjust based on your needs
+    headers.add(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; style-src 'self'; " +
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+    );
+
+    // Referrer policy
+    headers.add("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    // Permissions policy (formerly Feature-Policy)
+    headers.add(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(), payment=()"
+    );
   }
 
   private AuthResult validateAuth(FullHttpRequest request, SecurityRule rule) {
@@ -63,7 +161,8 @@ public class SecurityMiddleware implements Middleware {
       return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
     }
 
-    Set<String> userRoles = Set.of("admin");  // Reuse if static
+    // In a real application, validate the token and extract user roles/permissions
+    Set<String> userRoles = Set.of("admin");
     Set<String> userPermissions = Set.of("read", "write");
 
     return new AuthResult(true, "user-id", userRoles, userPermissions);
@@ -83,9 +182,9 @@ public class SecurityMiddleware implements Middleware {
   }
 
   private record AuthResult(boolean authenticated,
-                            String userId,
-                            Set<String> roles,
-                            Set<String> permissions) {
+                          String userId,
+                          Set<String> roles,
+                          Set<String> permissions) {
 
     public String getUser() {
       return userId;

@@ -2,8 +2,8 @@ package org.nexus.dbConnector;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.nexus.config.AppConfig;
 import org.nexus.config.DatabaseConfig;
-import org.nexus.config.EnvConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
 
@@ -12,11 +12,10 @@ import org.nexus.interfaces.DatabaseConnector;
  */
 public final class DatabaseConnectorFactory {
 
-  private static final Map<String, DatabaseConfig> databaseConfigs = loadDatabaseConfigs();
   private static final Map<String, DatabaseConnector> connectorCache = new ConcurrentHashMap<>();
+  private static final AppConfig config = AppConfig.getInstance();
 
   private DatabaseConnectorFactory() {
-    // Private constructor to prevent instantiation
   }
 
   /**
@@ -27,11 +26,7 @@ public final class DatabaseConnectorFactory {
    * @throws DatabaseException if the configuration is not found
    */
   public static DatabaseConfig getConfig(String name) {
-    DatabaseConfig config = databaseConfigs.get(name);
-    if (config == null) {
-      throw new DatabaseException("No database configuration found for: " + name);
-    }
-    return config;
+    return config.getDatabaseConfig(name);
   }
 
   /**
@@ -40,11 +35,7 @@ public final class DatabaseConnectorFactory {
    * @return Map of database configurations by name
    */
   public static Map<String, DatabaseConfig> getAllConfigs() {
-    return Map.copyOf(databaseConfigs);
-  }
-
-  private static Map<String, DatabaseConfig> loadDatabaseConfigs() {
-    return EnvConfig.loadDatabaseConfigs();
+    return config.getAllDatabaseConfigs();
   }
 
   /**

@@ -55,7 +55,7 @@ class LoadTests {
         });
 
     server = new Main();
-    server.start(0, testRoutes); // <-- inject the test route handler
+    server.start(0, testRoutes, 300, 1048576); // <-- inject the test route handler
     baseUrl = "http://127.0.0.1:" + server.getPort();
     http = HttpClient.newHttpClient();
   }

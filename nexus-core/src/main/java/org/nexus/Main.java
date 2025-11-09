@@ -16,7 +16,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
 import nexus.generated.GeneratedDIInitializer;
-import org.nexus.config.EnvConfig;
+import org.nexus.config.AppConfig;
+import org.nexus.config.SslConfig;
 import org.nexus.dbConnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
@@ -36,6 +37,11 @@ public class Main {
   private Channel serverChannel;
 
   static void main(String[] args) throws Exception {
+    if (args.length > 0 && ("--help".equals(args[0]) || "-h".equals(args[0]))) {
+      printHelp();
+      System.exit(0);
+    }
+
     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
       LOGGER.info("Shutdown, performing cleanup...");
       Main app = new Main();
@@ -43,41 +49,98 @@ public class Main {
       LOGGER.info("Done. Bye!");
     }));
 
-    int port = EnvConfig.getInt("SERVER_PORT", 15001);
+    // Initialize configuration system
+    AppConfig config = AppConfig.getInstance();
+    config.initialize(args);
 
-    for (String arg : args) {
-      switch (arg) {
-        case "--help":
-        case "-h":
-          printHelp();
-          System.exit(0);
-        default:
-          System.err.printf("Unknown argument: %s%n", arg);
-          printHelp();
-          System.exit(1);
+    // Get and validate configuration values
+    boolean enableSsl = config.getBoolean("SSL_ENABLED", false);
+    int port = config.getInt("PORT", enableSsl ? 15443 : 15000);
+    int idleTimeout = config.getInt("IDLE_TIMEOUT_SECONDS", 300);
+    int maxContentLength = config.getInt("MAX_CONTENT_LENGTH", 10_485_760);
+
+    // Log configuration
+    LOGGER.info("Server configuration:");
+    LOGGER.info("  Port: {}", port);
+    LOGGER.info("  SSL: {}", enableSsl ? "enabled" : "disabled");
+
+    // Configure SSL if enabled
+    SslConfig sslConfig = null;
+    if (enableSsl) {
+      try {
+        sslConfig = SslConfig.fromConfig();
+        LOGGER.info("SSL/TLS enabled with {} authentication",
+            config.getBoolean("SSL_REQUIRE_CLIENT_AUTH", false)
+                ? "required client" : "server-only");
+      } catch (Exception e) {
+        LOGGER.error("Failed to initialize SSL configuration: {}", e.getMessage());
+        System.err.println("SSL configuration error: " + e.getMessage());
+        System.exit(1);
       }
     }
 
     Main app = new Main();
-    app.start(port, null);
-    app.serverChannel.closeFuture().sync();
-    app.stop();
+    try {
+      app.start(port, null, idleTimeout, maxContentLength);
+      app.serverChannel.closeFuture().sync();
+    } finally {
+      app.stop();
+    }
   }
 
   private static void printHelp() {
     String help = """
-        nexus - Netty-based web server
-        Usage: nexus [options]
-          -h, --help            Prints this help
+        nexus - High-performance Netty-based web server
         
-        For more information, read the documentation in the repository
+        Usage: nexus [options]
+        
+        Options:
+          -h, --help            Show this help message and exit
+          -p, --port PORT        Port to listen on (default: 8080 for HTTP, 8443 for HTTPS)
+          -s, --ssl              Enable SSL/TLS (HTTPS)
+        
+        SSL Options (when -s/--ssl is used):
+          --keystore PATH        Path to the keystore file
+          --keystore-password P  Keystore password
+          --key-password P       Key password (defaults to keystore password)
+          --require-client-auth  Require client certificate authentication
+        
+        Advanced Options:
+          --idle-timeout SEC     Connection idle timeout in seconds (default: 300)
+          --max-content-length N Maximum HTTP content length in bytes (default: 10MB)
+        
+        Configuration can also be provided via environment variables or .env file.
+        Command line arguments take precedence over environment variables.
+        
+        Examples:
+          # Start with default settings
+          nexus
+        
+          # Start with custom port and SSL
+          nexus -p 15443 -s --keystore /path/to/keystore.p12 --keystore-password secret
+        
+          # Use environment variables
+          export SSL_ENABLED=true
+          export SSL_KEYSTORE_PATH=/path/to/keystore.p12
+          export SSL_KEYSTORE_PASSWORD=secret
+          nexus
         """;
-    System.out.print(help);
+    System.out.println(help);
   }
 
-  public void start(int port, TestRouteRegistry testRoutes) throws InterruptedException {
-    EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
-    EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
+  /**
+   * Starts the server with the specified configuration.
+   *
+   * @param port             The port to listen on
+   * @param testRoutes       Optional test routes (for testing only)
+   * @param idleTimeout      Connection idle timeout in seconds (default: 300)
+   * @param maxContentLength Maximum HTTP content length in bytes (default: 10MB)
+   * @throws InterruptedException if the server is interrupted while starting
+   */
+  public void start(int port, TestRouteRegistry testRoutes, int idleTimeout, int maxContentLength)
+      throws InterruptedException {
+    this.bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+    this.workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
     List<Middleware> middlewares = List.of(
         new LoggingMiddleware(),
@@ -87,6 +150,7 @@ public class Main {
     // Initialize dependency injection for controllers, services and repos
     GeneratedDIInitializer.initialize();
 
+    // Configure server with the loaded settings
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
         .channel(NioServerSocketChannel.class)
@@ -96,12 +160,13 @@ public class Main {
         .childOption(ChannelOption.TCP_NODELAY, true)
         .childOption(ChannelOption.SO_KEEPALIVE, true)
         .childOption(ChannelOption.SO_REUSEADDR, true)
+        .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, idleTimeout * 1000)
         .childHandler(new ChannelInitializer<>() {
           @Override
           protected void initChannel(Channel ch) {
             ChannelPipeline pipeline = ch.pipeline();
             pipeline.addLast(new HttpServerCodec());
-            pipeline.addLast(new HttpObjectAggregator(65536)); //64KB
+            pipeline.addLast(new HttpObjectAggregator(maxContentLength));
 
             if (testRoutes != null && !testRoutes.routes().isEmpty()) {
               pipeline.addLast(new TestRouterHandler(testRoutes));
