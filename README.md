@@ -17,6 +17,7 @@ Netty-based web server
   `@RequestBody` (GraalVM native image)
 - DI registry with @Controller, @Service, @Repository annotations built at build time
 - Middleware system
+- Database system with HikariCP and JDBC
 
 # Usage
 
