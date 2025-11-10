@@ -1,4 +1,4 @@
-package org.nexus.dbConnector;
+package org.nexus.dbconnector;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -6,9 +6,9 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
-import org.nexus.config.DatabaseConfig;
 
 /**
  * SQLite connector using HikariCP connection pool.
@@ -31,17 +31,17 @@ public class SqliteConnector implements DatabaseConnector {
   /**
    * Create a new SQLite connector with read-only option.
    *
-   * @param config The database configuration
+   * @param config   The database configuration
    * @param readOnly Whether to open the database in read-only mode
    */
   public SqliteConnector(DatabaseConfig config, boolean readOnly) {
     Objects.requireNonNull(config, "Database config cannot be null");
     this.config = config;
-    
+
     try {
       String databasePath = config.url().replaceFirst("^jdbc:sqlite:", "");
       File dbFile = new File(databasePath);
-      
+
       if (!readOnly && !dbFile.exists()) {
         // Create parent directories if they don't exist
         File parent = dbFile.getParentFile();

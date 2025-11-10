@@ -6,7 +6,7 @@ import org.nexus.NexusDatabase;
 import org.nexus.NexusExecutor;
 import org.nexus.annotations.Repository;
 import org.nexus.config.DatabaseConfig;
-import org.nexus.dbConnector.DatabaseConnectorFactory;
+import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.interfaces.DatabaseConnector;
 import org.nexus.model.Test;
 

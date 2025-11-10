@@ -17,7 +17,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 import nexus.generated.GeneratedDIInitializer;
 import org.nexus.config.SslConfig;
-import org.nexus.dbConnector.DatabaseConnectorFactory;
+import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;

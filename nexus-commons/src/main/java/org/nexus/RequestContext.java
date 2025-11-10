@@ -28,7 +28,7 @@ public final class RequestContext {
   private Map<String, Object> attributes;
   private BiConsumer<FullHttpResponse, Throwable> completionHandler;  // slot for completion handler
   private List<BiConsumer<FullHttpResponse, Throwable>> extraHandlers;  // more than 1 (rare)
-  private HttpHeaders responseHeaders;
+  private HttpHeaders requestHeaders;
   private long endTime = System.currentTimeMillis();
   private FullHttpResponse response;
   private boolean responseCompleted = false;
@@ -56,10 +56,10 @@ public final class RequestContext {
   }
 
   public HttpHeaders getRequestHeaders() {
-    if (responseHeaders == null) {
-      responseHeaders = new DefaultHttpHeaders();
+    if (requestHeaders == null) {
+      requestHeaders = new DefaultHttpHeaders();
     }
-    return responseHeaders;
+    return requestHeaders;
   }
 
   public Map<String, String> getPathParams() {

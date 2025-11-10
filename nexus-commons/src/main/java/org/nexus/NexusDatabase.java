@@ -28,7 +28,7 @@ public class NexusDatabase implements AutoCloseable {
    * @throws NullPointerException if connector is null
    */
   public NexusDatabase(DatabaseConnector connector) {
-    this.connector = Objects.requireNonNull(connector, "DbConnector must not be null");
+    this.connector = Objects.requireNonNull(connector, "dbconnector must not be null");
   }
 
   // region Transaction Management

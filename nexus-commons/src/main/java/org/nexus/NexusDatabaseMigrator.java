@@ -11,8 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.nexus.config.DatabaseConfig;
-import org.nexus.dbConnector.DatabaseConnectorFactory;
+import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
 import org.slf4j.Logger;
@@ -110,13 +111,18 @@ public class NexusDatabaseMigrator {
    * Load and sort SQL migration files from the directory.
    */
   private List<Path> loadMigrationFiles(Path migrationsPath) throws IOException {
-    List<Path> files = Files.walk(migrationsPath, 1)
-        .filter(p -> p.toString().endsWith(".sql"))
-        .sorted() // Sort alphabetically (assume numbered prefixes)
-        .collect(Collectors.toList());
+    List<Path> files;
+    try (Stream<Path> stream = Files.walk(migrationsPath, 1)) {
+      files = stream
+          .filter(p -> p.toString().endsWith(".sql"))
+          .sorted() // Sort alphabetically (assume numbered prefixes)
+          .collect(Collectors.toList());
+    }
+
     if (files.isEmpty()) {
       LOGGER.warn("No migration files found in: {}", migrationsPath.toAbsolutePath());
     }
+
     return files;
   }
 

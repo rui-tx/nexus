@@ -1,4 +1,4 @@
-package org.nexus.dbConnector;
+package org.nexus.dbconnector;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

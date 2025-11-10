@@ -1,4 +1,4 @@
-package org.nexus.dbConnector;
+package org.nexus.dbconnector;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
@@ -28,7 +28,7 @@ public class PostgresConnector implements DatabaseConnector {
 
     try {
       HikariConfig hikariConfig = new HikariConfig();
-      
+
       hikariConfig.setJdbcUrl(config.url());
       hikariConfig.setUsername(config.username());
       hikariConfig.setPassword(config.password());
