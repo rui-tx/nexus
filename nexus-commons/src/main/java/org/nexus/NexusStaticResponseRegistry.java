@@ -13,7 +13,7 @@ import io.netty.util.CharsetUtil;
 import java.util.HashMap;
 import java.util.Map;
 
-public class StaticResponseRegistry {
+public class NexusStaticResponseRegistry {
 
   private static final Map<String, FullHttpResponse> cache = new HashMap<>();
 

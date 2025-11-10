@@ -16,6 +16,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
 import nexus.generated.GeneratedDIInitializer;
+import org.nexus.config.SslConfig;
+import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
@@ -33,62 +35,119 @@ public class Main {
   private EventLoopGroup workerGroup;
   private Channel serverChannel;
 
-  // cli entry
   static void main(String[] args) throws Exception {
-    int port = 15000;
+    if (args.length > 0 && ("--help".equals(args[0]) || "-h".equals(args[0]))) {
+      printHelp();
+      System.exit(0);
+    }
 
-    for (int i = 0; i < args.length; i++) {
-      switch (args[i]) {
-        case "--help":
-        case "-h":
-          printHelp();
-          System.exit(0);
-        case "--port":
-        case "-p":
-          if (i + 1 < args.length) {
-            port = Integer.parseInt(args[++i]);
-          } else {
-            System.err.println("Missing value for port");
-            printHelp();
-            System.exit(1);
-          }
-          break;
-        default:
-          System.err.printf("Unknown argument: %s%n", args[i]);
-          printHelp();
-          System.exit(1);
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+      LOGGER.info("Shutdown, performing cleanup...");
+      Main app = new Main();
+      app.stop();
+      LOGGER.info("Done. Bye!");
+    }));
+
+    // Initialize configuration system
+    NexusConfig config = NexusConfig.getInstance();
+    config.initialize(args);
+
+    // Check for migration flag
+    String runMigration = config.get("run-migration");
+    if (runMigration != null) {
+      String specificDb = "true".equals(runMigration) ? null : runMigration;
+      new NexusDatabaseMigrator().migrateAll(specificDb);
+      LOGGER.info("Migrations completed. Exiting.");
+      System.exit(0);
+    }
+
+    // Get and validate configuration values
+    boolean enableSsl = config.getBoolean("SSL_ENABLED", false);
+    String bindAddress = config.get("BIND_ADDRESS", "0.0.0.0");
+    int port = config.getInt("SERVER_PORT", enableSsl ? 443 : 80);
+    int idleTimeout = config.getInt("IDLE_TIMEOUT_SECONDS", 300);
+    int maxContentLength = config.getInt("MAX_CONTENT_LENGTH", 10_485_760);
+
+    // Configure SSL if enabled
+    SslConfig sslConfig = null;
+    if (enableSsl) {
+      try {
+        sslConfig = SslConfig.fromConfig();
+        LOGGER.info("SSL/TLS enabled with {} authentication",
+            config.getBoolean("SSL_REQUIRE_CLIENT_AUTH", false)
+                ? "required client" : "server-only");
+      } catch (Exception e) {
+        LOGGER.error("Failed to initialize SSL configuration: {}", e.getMessage());
+        System.err.println("SSL configuration error: " + e.getMessage());
+        System.exit(1);
       }
     }
 
     Main app = new Main();
-    app.start(port, null);
-    app.serverChannel.closeFuture().sync();
-    app.stop();
+    try {
+      app.start(bindAddress, port, null, idleTimeout, maxContentLength, sslConfig);
+      app.serverChannel.closeFuture().sync();
+    } finally {
+      app.stop();
+    }
   }
 
   private static void printHelp() {
     String help = """
         nexus - Netty-based web server
-        Usage: nexus [options]
-          -p, --port <port>     Server port
-          -h, --help            Prints this help
         
-        For more information, read the documentation in the repository
+        Usage:
+        EXPORT BIND_ADDRESS=0.0.0.0
+        EXPORT SERVER_PORT=15000
+        nexus
+        
+        Use environment variables or .env file to setup the server
+        Check https://github.com/ruitx/nexus for more information on the available options
+        
+        Options:
+          -h, --help            Show this help message and exit
+          --run-migration       Run database migrations for all DBs and exit
+          --run-migration=DB_NAME  Run migrations for specific DB and exit
         """;
-    System.out.print(help);
+    System.out.println(help);
   }
 
-  public void start(int port, TestRouteRegistry testRoutes) throws InterruptedException {
-    EventLoopGroup bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
-    EventLoopGroup workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
+  /**
+   * Starts the server with the specified configuration.
+   *
+   * @param port             The port to listen on
+   * @param testRoutes       Optional test routes (for testing only)
+   * @param idleTimeout      Connection idle timeout in seconds (default: 300)
+   * @param maxContentLength Maximum HTTP content length in bytes (default: 10MB)
+   * @param sslConfig        SSL configuration (null for HTTP)
+   * @throws InterruptedException if the server is interrupted while starting
+   */
+  public void start(String bindAddress, int port, TestRouteRegistry testRoutes,
+      int idleTimeout, int maxContentLength, SslConfig sslConfig)
+      throws InterruptedException {
+    this.bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
+    this.workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
 
     List<Middleware> middlewares = List.of(
         new LoggingMiddleware(),
-        new SecurityMiddleware()
+        new SecurityMiddleware(
+            NexusConfig
+                .getInstance()
+                .getBoolean("SSL_ENABLED", false))
     );
 
     // Initialize dependency injection for controllers, services and repos
     GeneratedDIInitializer.initialize();
+
+    final boolean isSsl = sslConfig != null;
+    if (isSsl) {
+      try {
+        sslConfig.getSslContext();
+      } catch (Exception e) {
+        LOGGER.error("Failed to initialize SSL context", e);
+        throw new RuntimeException("Failed to initialize SSL context", e);
+      }
+    }
 
     ServerBootstrap bootstrap = new ServerBootstrap();
     bootstrap.group(bossGroup, workerGroup)
@@ -99,27 +158,56 @@ public class Main {
         .childOption(ChannelOption.TCP_NODELAY, true)
         .childOption(ChannelOption.SO_KEEPALIVE, true)
         .childOption(ChannelOption.SO_REUSEADDR, true)
+        .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, idleTimeout * 1000)
         .childHandler(new ChannelInitializer<>() {
           @Override
           protected void initChannel(Channel ch) {
             ChannelPipeline pipeline = ch.pipeline();
-            pipeline.addLast(new HttpServerCodec());
-            pipeline.addLast(new HttpObjectAggregator(65536)); //64KB
-
-            if (testRoutes != null && !testRoutes.routes().isEmpty()) {
-              pipeline.addLast(new TestRouterHandler(testRoutes));
+            if (isSsl) {
+              try {
+                pipeline.addLast("ssl", sslConfig.getSslContext().newHandler(ch.alloc()));
+                LOGGER.debug("Added SSL handler to pipeline");
+              } catch (Exception e) {
+                LOGGER.error("Failed to initialize SSL handler", e);
+                ch.close();
+                return;
+              }
             }
 
-            pipeline.addLast(new DefaultHttpServerHandler(middlewares));
+            pipeline.addLast("http-codec", new HttpServerCodec());
+            pipeline.addLast("http-aggregator", new HttpObjectAggregator(maxContentLength));
+
+            if (testRoutes != null && !testRoutes.routes().isEmpty()) {
+              pipeline.addLast("test-router", new TestRouterHandler(testRoutes));
+            }
+
+            pipeline.addLast("http-handler", new DefaultHttpServerHandler(middlewares));
           }
-        })
-        .childOption(ChannelOption.SO_KEEPALIVE, true);
+        });
 
-    ChannelFuture bindFuture = bootstrap.bind(port).sync();
-    serverChannel = bindFuture.channel();
+    try {
+      InetSocketAddress address = new InetSocketAddress(bindAddress, port);
+      ChannelFuture bindFuture = bootstrap.bind(address).sync();
+      serverChannel = bindFuture.channel();
+      int actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
+      String host = "localhost".equals(bindAddress) || "0.0.0.0".equals(bindAddress)
+          ? "localhost"
+          : bindAddress;
+      LOGGER.info("Server started on {}:{} ({}://{}:{})",
+          bindAddress, actualPort,
+          isSsl ? "https" : "http",
+          host,
+          actualPort);
+    } catch (Exception e) {
+      LOGGER.error("Failed to start server on port {}", port, e);
+      throw e;
+    }
+  }
 
-    int actualPort = ((InetSocketAddress) serverChannel.localAddress()).getPort();
-    LOGGER.info("Started at port {}", actualPort);
+  // for tests
+  public void start(int port, TestRouteRegistry testRoutes, int idleTimeout, int maxContentLength)
+      throws InterruptedException {
+    start("0.0.0.0", port, testRoutes, idleTimeout, maxContentLength, null);
   }
 
   public int getPort() {
@@ -130,10 +218,14 @@ public class Main {
   }
 
   public void stop() {
+
+    // Close server channel
     if (serverChannel != null) {
       serverChannel.close().awaitUninterruptibly();
       serverChannel = null;
     }
+
+    // Shutdown worker groups
     if (bossGroup != null) {
       bossGroup.shutdownGracefully().awaitUninterruptibly();
       bossGroup = null;
@@ -141,6 +233,12 @@ public class Main {
     if (workerGroup != null) {
       workerGroup.shutdownGracefully().awaitUninterruptibly();
       workerGroup = null;
+    }
+
+    try {
+      DatabaseConnectorFactory.closeAll();
+    } catch (Exception e) {
+      LOGGER.error("Error closing database connections", e);
     }
   }
 }

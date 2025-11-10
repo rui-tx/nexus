@@ -1,6 +1,8 @@
 package org.nexus.middleware;
 
+import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +22,13 @@ public class SecurityMiddleware implements Middleware {
   private static final Logger LOGGER = LoggerFactory.getLogger(SecurityMiddleware.class);
   private static final String AUTH_HEADER = "Authorization";
   private static final Set<String> EMPTY_SET = Collections.emptySet();
+  private final boolean enforceHsts;
+  private final boolean isHttps;
+
+  public SecurityMiddleware(boolean isHttps) {
+    this.isHttps = isHttps;
+    this.enforceHsts = isHttps;
+  }
 
   @Override
   public void handle(RequestContext ctx, MiddlewareChain chain) throws Exception {
@@ -29,6 +38,11 @@ public class SecurityMiddleware implements Middleware {
     int qIndex = uri.indexOf('?');
     String path = (qIndex < 0) ? uri : uri.substring(0, qIndex);
 
+    if (isHttps) {
+      applySecurityHeaders(ctx);
+    }
+
+    // Check authentication and authorization
     SecurityRule rule = GeneratedSecurityRules.getRule(method, path);
     if (rule == null || rule.permitAll()) {
       chain.next(ctx);
@@ -41,15 +55,62 @@ public class SecurityMiddleware implements Middleware {
       return;
     }
 
-    if (!authResult.hasRequiredRoles(rule.requiredRoles()) || !authResult.hasRequiredPermissions(
-        rule.requiredPermissions())) {
+    if (!authResult.hasRequiredRoles(rule.requiredRoles()) ||
+        !authResult.hasRequiredPermissions(rule.requiredPermissions())) {
       throwSecurityException("Forbidden", "Insufficient privileges", 403, path);
       return;
     }
 
-    // ctx.setAttribute("user", authResult.getUser());  // If needed
+    // Store user in context if needed
+    // ctx.setAttribute("user", authResult.getUser());
 
     chain.next(ctx);
+  }
+
+  /**
+   * Applies security headers to the response.
+   *
+   * @param ctx The request context
+   */
+  private void applySecurityHeaders(RequestContext ctx) {
+    // Get or create response headers
+    HttpHeaders headers = ctx.getRequestHeaders();
+    if (headers == null) {
+      headers = new DefaultHttpHeaders();
+    }
+
+    // HSTS - only send over HTTPS
+    if (enforceHsts) {
+      headers.add(
+          "Strict-Transport-Security",
+          "max-age=31536000; includeSubDomains" // 1 year, include subdomains
+      );
+    }
+
+    // Prevent MIME type sniffing
+    headers.add("X-Content-Type-Options", "nosniff");
+
+    // Prevent clickjacking
+    headers.add("X-Frame-Options", "DENY");
+
+    // XSS protection
+    headers.add("X-XSS-Protection", "1; mode=block");
+
+    // Content Security Policy - TODO: adjust
+    headers.add(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; style-src 'self'; " +
+            "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+    );
+
+    // Referrer policy
+    headers.add("Referrer-Policy", "strict-origin-when-cross-origin");
+
+    // Permissions policy (formerly Feature-Policy) TODO: adjust
+    headers.add(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=(), payment=()"
+    );
   }
 
   private AuthResult validateAuth(FullHttpRequest request, SecurityRule rule) {
@@ -63,7 +124,8 @@ public class SecurityMiddleware implements Middleware {
       return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
     }
 
-    Set<String> userRoles = Set.of("admin");  // Reuse if static
+    // In a real application, validate the token and extract user roles/permissions
+    Set<String> userRoles = Set.of("admin");
     Set<String> userPermissions = Set.of("read", "write");
 
     return new AuthResult(true, "user-id", userRoles, userPermissions);
