@@ -2,9 +2,9 @@ name: Compile check
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "*" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "*" ]
 
 jobs:
   compile:
