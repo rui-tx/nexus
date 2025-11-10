@@ -21,24 +21,19 @@ public class ApiRepository {
     this.db = new NexusDatabase(connector);
   }
 
-  public CompletableFuture<List<Test>> getData(String name) {
+  public CompletableFuture<Integer> getData(String name) {
     return CompletableFuture.supplyAsync(() -> {
       db.insert(
           "INSERT INTO test (name) VALUES (?)",
-          rs -> rs.getInt(1),
+          _ -> true,
           name
       );
 
       return db.query(
-          """
-              SELECT
-                t.id, t.name
-              FROM
-                test t
-              WHERE t.name = ?;""",
-          rs -> new Test(rs.getLong("id"), rs.getString("name")),
+          "SELECT COUNT(*) FROM test t WHERE t.name = ?",
+          rs -> rs.getInt(1),
           name
-      );
+      ).getFirst();
     }, NexusExecutor.INSTANCE.get());
   }
 

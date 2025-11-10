@@ -78,7 +78,7 @@ public class ApiService {
   public CompletableFuture<TestDto> db(String name) {
     return apiRepository.getData(name)
         .thenApply(
-            rs -> new TestDto("Success. %s has %s entries".formatted(name, rs.size()))
+            rs -> new TestDto("Success. %s has %s entries".formatted(name, rs))
         )
         .exceptionally(ex -> {
           LOGGER.error(ex.getMessage(), ex);

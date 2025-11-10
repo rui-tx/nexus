@@ -22,12 +22,15 @@ RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 
+LABEL org.nexus.image.version="0.1-ALPHA-SNAPSHOT"
+
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends     ca-certificates     vim     htop     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/nexus-core/target/native/nexus-0.1-ALPHA-SNAPSHOT /app/nexus
 COPY --from=builder /app/.env /app/.env
+COPY --from=builder /app/migrations /app/migrations
 
 RUN chmod +x /app/nexus
 

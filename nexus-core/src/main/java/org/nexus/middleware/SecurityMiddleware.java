@@ -9,7 +9,6 @@ import java.util.Set;
 import nexus.generated.GeneratedSecurityRules;
 import org.nexus.RequestContext;
 import org.nexus.SecurityRule;
-import org.nexus.config.AppConfig;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
@@ -18,11 +17,6 @@ import org.nexus.interfaces.ProblemDetails;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Middleware that handles security-related concerns including authentication, authorization,
- * and security headers. This middleware should be one of the first in the chain to ensure
- * security policies are applied to all requests.
- */
 public class SecurityMiddleware implements Middleware {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SecurityMiddleware.class);
@@ -31,36 +25,9 @@ public class SecurityMiddleware implements Middleware {
   private final boolean enforceHsts;
   private final boolean isHttps;
 
-  /**
-   * Creates a new SecurityMiddleware with default settings.
-   * HSTS will be enabled if the server is running with HTTPS.
-   */
-  public SecurityMiddleware() {
-    this(AppConfig.getInstance().getBoolean("SSL_ENABLED", false));
-  }
-
-  /**
-   * Creates a new SecurityMiddleware with custom settings.
-   *
-   * @param isHttps Whether the server is running with HTTPS
-   */
   public SecurityMiddleware(boolean isHttps) {
-    this(isHttps, isHttps); // Enable HSTS by default when using HTTPS
-  }
-
-  /**
-   * Creates a new SecurityMiddleware with custom settings.
-   *
-   * @param isHttps Whether the server is running with HTTPS
-   * @param enforceHsts Whether to enable HSTS (only applicable when isHttps is true)
-   */
-  public SecurityMiddleware(boolean isHttps, boolean enforceHsts) {
     this.isHttps = isHttps;
-    this.enforceHsts = enforceHsts && isHttps; // HSTS only makes sense over HTTPS
-
-    if (this.enforceHsts) {
-      LOGGER.info("HSTS enabled - browsers will enforce HTTPS for 1 year");
-    }
+    this.enforceHsts = isHttps;
   }
 
   @Override
@@ -71,8 +38,9 @@ public class SecurityMiddleware implements Middleware {
     int qIndex = uri.indexOf('?');
     String path = (qIndex < 0) ? uri : uri.substring(0, qIndex);
 
-    // Apply security headers to all responses
-    applySecurityHeaders(ctx);
+    if (isHttps) {
+      applySecurityHeaders(ctx);
+    }
 
     // Check authentication and authorization
     SecurityRule rule = GeneratedSecurityRules.getRule(method, path);
@@ -87,7 +55,7 @@ public class SecurityMiddleware implements Middleware {
       return;
     }
 
-    if (!authResult.hasRequiredRoles(rule.requiredRoles()) || 
+    if (!authResult.hasRequiredRoles(rule.requiredRoles()) ||
         !authResult.hasRequiredPermissions(rule.requiredPermissions())) {
       throwSecurityException("Forbidden", "Insufficient privileges", 403, path);
       return;
@@ -99,11 +67,6 @@ public class SecurityMiddleware implements Middleware {
     chain.next(ctx);
   }
 
-  /**
-   * Applies security headers to the response.
-   *
-   * @param ctx The request context
-   */
   /**
    * Applies security headers to the response.
    *
@@ -130,20 +93,20 @@ public class SecurityMiddleware implements Middleware {
     // Prevent clickjacking
     headers.add("X-Frame-Options", "DENY");
 
-    // XSS protection (legacy, but doesn't hurt)
+    // XSS protection
     headers.add("X-XSS-Protection", "1; mode=block");
 
-    // Content Security Policy - adjust based on your needs
+    // Content Security Policy - TODO: adjust
     headers.add(
         "Content-Security-Policy",
         "default-src 'self'; script-src 'self'; style-src 'self'; " +
-        "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
+            "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none'"
     );
 
     // Referrer policy
     headers.add("Referrer-Policy", "strict-origin-when-cross-origin");
 
-    // Permissions policy (formerly Feature-Policy)
+    // Permissions policy (formerly Feature-Policy) TODO: adjust
     headers.add(
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=(), payment=()"
@@ -182,9 +145,9 @@ public class SecurityMiddleware implements Middleware {
   }
 
   private record AuthResult(boolean authenticated,
-                          String userId,
-                          Set<String> roles,
-                          Set<String> permissions) {
+                            String userId,
+                            Set<String> roles,
+                            Set<String> permissions) {
 
     public String getUser() {
       return userId;

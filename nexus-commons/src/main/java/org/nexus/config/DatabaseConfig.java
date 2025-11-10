@@ -13,6 +13,7 @@ import org.nexus.enums.DatabaseType;
  * @param poolSize          The maximum number of connections in the pool
  * @param autoCommit        Whether to auto-commit transactions
  * @param connectionTimeout The connection timeout in milliseconds
+ * @param migrationsPath    The path for the SQL migration files
  */
 public record DatabaseConfig(
     String name,
@@ -22,7 +23,8 @@ public record DatabaseConfig(
     String password,
     int poolSize,
     boolean autoCommit,
-    long connectionTimeout
+    long connectionTimeout,
+    String migrationsPath
 ) {
 
   /**
@@ -42,7 +44,8 @@ public record DatabaseConfig(
           "",
           10,
           true,
-          30000
+          30000,
+          "db/migrations/sqlite"
       );
       case POSTGRES -> new DatabaseConfig(
           name,
@@ -52,38 +55,44 @@ public record DatabaseConfig(
           "postgres",
           10,
           true,
-          30000
+          30000,
+          "db/migrations/postgres"
       );
     };
   }
 
   public DatabaseConfig withUrl(String url) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
   }
 
   public DatabaseConfig withUsername(String username) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
   }
 
   public DatabaseConfig withPassword(String password) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
   }
 
   public DatabaseConfig withPoolSize(int poolSize) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
   }
 
   public DatabaseConfig withAutoCommit(boolean autoCommit) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
   }
 
   public DatabaseConfig withConnectionTimeout(long connectionTimeout) {
     return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
-        connectionTimeout);
+        connectionTimeout, migrationsPath);
+  }
+
+  public DatabaseConfig withMigrationsPath(String migrationsPath) {
+    return new DatabaseConfig(name, type, url, username, password, poolSize, autoCommit,
+        connectionTimeout, migrationsPath);
   }
 }

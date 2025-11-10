@@ -6,7 +6,7 @@ import java.sql.SQLException;
 /**
  * Interface for database connection management.
  */
-public interface DatabaseConnector {
+public interface DatabaseConnector extends AutoCloseable {
 
   /**
    * Get a database connection.

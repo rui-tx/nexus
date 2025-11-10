@@ -35,12 +35,19 @@ RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 
+LABEL org.nexus.image.version="$REVISION"
+
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    vim \
+    htop \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/nexus-core/target/native/nexus-0.1-ALPHA-SNAPSHOT /app/nexus
+COPY --from=builder /app/nexus-core/target/native/nexus-$REVISION /app/nexus
 COPY --from=builder /app/.env /app/.env
+COPY --from=builder /app/migrations /app/migrations
 
 RUN chmod +x /app/nexus
 
@@ -50,3 +57,13 @@ ENTRYPOINT ["/app/nexus"]
 EOF
 
 echo "Dockerfile generated with revision: $REVISION"
+
+# Build and tag
+podman build -t nexus:"$REVISION" .
+podman tag nexus:"$REVISION" nexus:latest
+
+echo "Image generated with revision: $REVISION"
+
+# Optional: push to registry
+# podman tag localhost/nexus:$REVISION docker.io/yourusername/nexus:$REVISION
+# podman push docker.io/yourusername/nexus:$REVISION

@@ -1,4 +1,4 @@
-package org.nexus.config;
+package org.nexus;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -7,29 +7,25 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.enums.DatabaseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Centralized application configuration with proper priority order: 1. Command-line arguments
- * (highest priority) 2. .env file (middle priority) 3. System environment variables (lowest
- * priority)
- */
-public final class AppConfig {
+public final class NexusConfig {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(AppConfig.class);
-  private static AppConfig instance;
+  private static final Logger LOGGER = LoggerFactory.getLogger(NexusConfig.class);
+  private static NexusConfig instance;
   private final Map<String, String> config = new HashMap<>();
   private final Map<String, DatabaseConfig> databaseConfigs = new HashMap<>();
   private boolean initialized = false;
 
-  private AppConfig() {
+  private NexusConfig() {
   }
 
-  public static synchronized AppConfig getInstance() {
+  public static synchronized NexusConfig getInstance() {
     if (instance == null) {
-      instance = new AppConfig();
+      instance = new NexusConfig();
     }
     return instance;
   }
@@ -39,21 +35,18 @@ public final class AppConfig {
       return;
     }
 
-    // 1. Load system environment variables (lowest priority)
+    // Priority: system environment variables > .env file > CLI arguments
+
     config.putAll(System.getenv());
     LOGGER.debug("Loaded {} system environment variables", config.size());
-
-    // 2. Load .env file (middle priority)
     loadEnvFile(".env");
-
-    // 3. Parse command line arguments (highest priority)
     parseCommandLineArgs(args);
 
-    // 4. Load database configurations
+    // load database configurations
     loadDatabaseConfigs();
 
     initialized = true;
-    LOGGER.info("Configuration initialized with {} parameters", config.size());
+    LOGGER.debug("Configuration initialized with {} parameters", config.size());
   }
 
   private void parseCommandLineArgs(String[] args) {
@@ -96,7 +89,7 @@ public final class AppConfig {
               key.toLowerCase().contains("password") ? "*****" : value);
         }
       }
-      LOGGER.info("Loaded {} parameters from {}", count, envPath.getFileName());
+      LOGGER.debug("Loaded {} parameters from {}", count, envPath.getFileName());
     } catch (IOException e) {
       LOGGER.warn("Failed to load .env file: {}", e.getMessage());
     }
@@ -131,10 +124,11 @@ public final class AppConfig {
           .withPassword(get(prefix + "PASSWORD", ""))
           .withPoolSize(getInt(prefix + "POOL_SIZE", 10))
           .withAutoCommit(getBoolean(prefix + "AUTO_COMMIT", true))
-          .withConnectionTimeout(getInt(prefix + "CONNECTION_TIMEOUT", 30000));
+          .withConnectionTimeout(getInt(prefix + "CONNECTION_TIMEOUT", 30000))
+          .withMigrationsPath(get(prefix + "MIGRATIONS_PATH", null));
 
       databaseConfigs.put(name, dbConfig);
-      LOGGER.info("Configured database '{}' (type: {})", name, type);
+      LOGGER.debug("Configured database '{}' (type: {})", name, type);
       dbNum++;
     }
   }

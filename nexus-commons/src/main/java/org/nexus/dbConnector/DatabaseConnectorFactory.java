@@ -2,7 +2,7 @@ package org.nexus.dbConnector;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import org.nexus.config.AppConfig;
+import org.nexus.NexusConfig;
 import org.nexus.config.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
@@ -13,7 +13,7 @@ import org.nexus.interfaces.DatabaseConnector;
 public final class DatabaseConnectorFactory {
 
   private static final Map<String, DatabaseConnector> connectorCache = new ConcurrentHashMap<>();
-  private static final AppConfig config = AppConfig.getInstance();
+  private static final NexusConfig config = NexusConfig.getInstance();
 
   private DatabaseConnectorFactory() {
   }

@@ -14,18 +14,14 @@ import java.util.Arrays;
 import java.util.List;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
+import org.nexus.NexusConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * Configuration for SSL/TLS settings used by the server. Supports loading configuration from
- * environment variables and provides secure defaults for modern TLS configurations.
- */
 public final class SslConfig {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SslConfig.class);
 
-  // Modern, secure cipher suites - prioritizing forward secrecy (ECDHE)
   private static final List<String> SECURE_CIPHERS = List.of(
       // TLS 1.3 ciphers (preferred - provides forward secrecy by default)
       "TLS_AES_256_GCM_SHA384",
@@ -40,7 +36,6 @@ public final class SslConfig {
       "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256"
   );
 
-  // Only modern TLS versions
   private static final String[] SECURE_PROTOCOLS = {"TLSv1.3", "TLSv1.2"};
 
   private final String keystorePath;
@@ -48,18 +43,6 @@ public final class SslConfig {
   private final String keyPassword;
   private final boolean requireClientAuth;
   private SslContext sslContext;
-
-  /**
-   * Creates a new SSL configuration with the specified keystore and password. Client authentication
-   * is disabled by default.
-   *
-   * @param keystorePath     Path to the keystore file
-   * @param keystorePassword Password for the keystore
-   * @param keyPassword      Password for the key (if different from keystore password)
-   */
-  public SslConfig(String keystorePath, String keystorePassword, String keyPassword) {
-    this(keystorePath, keystorePassword, keyPassword, false);
-  }
 
   /**
    * Creates a new SSL configuration with the specified parameters.
@@ -92,32 +75,19 @@ public final class SslConfig {
   }
 
   /**
-   * Creates an SslConfig instance by reading configuration from environment variables.
-   * Required environment variables:
-   * - SSL_KEYSTORE_PATH: Path to the keystore file
-   * - SSL_KEYSTORE_PASSWORD: Password for the keystore
-   *
-   * Optional environment variables:
-   * - SSL_KEY_PASSWORD: Password for the key (defaults to keystore password)
-   * - SSL_REQUIRE_CLIENT_AUTH: Whether to require client certificate authentication (default: false)
-   *
-   * @return A new SslConfig instance
-   * @throws IllegalStateException if required environment variables are not set
-   */
-  /**
-   * Creates an SslConfig instance by reading configuration from the application config. Required
-   * configuration: - SSL_KEYSTORE_PATH: Path to the keystore file - SSL_KEYSTORE_PASSWORD: Password
-   * for the keystore
+   * Creates an SslConfig instance by reading configuration from configuration. Required environment
+   * variables: - SSL_KEYSTORE_PATH: Path to the keystore file - SSL_KEYSTORE_PASSWORD: Password for
+   * the keystore
    * <p>
-   * Optional configuration: - SSL_KEY_PASSWORD: Password for the key (defaults to keystore
+   * Optional environment variables: - SSL_KEY_PASSWORD: Password for the key (defaults to keystore
    * password) - SSL_REQUIRE_CLIENT_AUTH: Whether to require client certificate authentication
    * (default: false)
    *
    * @return A new SslConfig instance
-   * @throws IllegalStateException if required configuration is not set
+   * @throws IllegalStateException if required environment variables are not set
    */
   public static SslConfig fromConfig() {
-    AppConfig config = AppConfig.getInstance();
+    NexusConfig config = NexusConfig.getInstance();
     String keystorePath = config.get("SSL_KEYSTORE_PATH");
     String keystorePassword = config.get("SSL_KEYSTORE_PASSWORD");
     String keyPassword = config.get("SSL_KEY_PASSWORD");
@@ -130,7 +100,7 @@ public final class SslConfig {
       throw new IllegalStateException("SSL enabled but SSL_KEYSTORE_PASSWORD is not set");
     }
 
-    LOGGER.info("Loading SSL configuration");
+    LOGGER.debug("Loading SSL configuration");
     return new SslConfig(keystorePath, keystorePassword, keyPassword, requireClientAuth);
   }
 
@@ -159,7 +129,7 @@ public final class SslConfig {
    * @throws IOException              if there's an error reading the keystore
    */
   private SslContext createSslContext() throws GeneralSecurityException, IOException {
-    LOGGER.info("Initializing SSL context from keystore: {}", keystorePath);
+    LOGGER.debug("Initializing SSL context from keystore: {}", keystorePath);
 
     // Load keystore
     KeyStore keyStore = loadKeyStore();
@@ -180,12 +150,12 @@ public final class SslConfig {
 
     if (requireClientAuth) {
       builder.clientAuth(ClientAuth.REQUIRE);
-      LOGGER.info("Client certificate authentication REQUIRED");
+      LOGGER.debug("Client certificate authentication REQUIRED");
     }
 
     SslContext context = builder.build();
 
-    LOGGER.info("SSL context initialized successfully");
+    LOGGER.debug("SSL context initialized successfully");
     LOGGER.debug("  Protocols: {}", Arrays.toString(SECURE_PROTOCOLS));
     LOGGER.debug("  Cipher suites: {} configured", SECURE_CIPHERS.size());
     LOGGER.debug("  Client auth: {}", requireClientAuth ? "REQUIRED" : "OPTIONAL");

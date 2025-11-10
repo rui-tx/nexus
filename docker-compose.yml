@@ -1,12 +1,12 @@
 services:
   nexus:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: nexus:latest
     container_name: nexus-server
     ports:
       - "15000:15000"
     restart: unless-stopped
+    volumes:
+      - nexus-sqlite-vol:/app/db
     depends_on:
       database:
         condition: service_healthy
@@ -21,9 +21,13 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: nexus-db
     volumes:
-      - ./.db/postgres:/var/lib/postgresql
+      - nexus-postgres-vol:/var/lib/postgresql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
       interval: 5s
       timeout: 5s
       retries: 5
+
+volumes:
+  nexus-sqlite-vol:
+  nexus-postgres-vol:
