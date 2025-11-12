@@ -1,8 +1,9 @@
-package org.nexus.config;
+package org.nexus;
 
-import org.nexus.NexusConfig;
+import org.nexus.config.jwt.JwtConfig;
+import org.nexus.config.jwt.JwtService;
 
-public class NexusJwt {
+public final class NexusJwt {
 
   private static volatile NexusJwt instance;
   private final JwtConfig config;

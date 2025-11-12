@@ -1,4 +1,4 @@
-package org.nexus.config;
+package org.nexus.config.jwt;
 
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import java.nio.charset.StandardCharsets;

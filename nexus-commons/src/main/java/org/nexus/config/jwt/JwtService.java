@@ -1,4 +1,4 @@
-package org.nexus.config;
+package org.nexus.config.jwt;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -15,7 +15,7 @@ import java.util.Date;
 import java.util.Map;
 
 public class JwtService {
-  
+
   private final JwtConfig config;
   private final JWSSigner accessSigner;
   private final JWSSigner refreshSigner;

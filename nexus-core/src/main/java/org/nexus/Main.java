@@ -15,11 +15,10 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
-import nexus.generated.GeneratedDIInitializer;
-import org.nexus.config.JwtService;
-import org.nexus.config.NexusJwt;
 import org.nexus.config.SslConfig;
+import org.nexus.config.jwt.JwtService;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
+import org.nexus.generated.GeneratedDIInitializer;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
@@ -66,7 +65,7 @@ public class Main {
     // Get and validate configuration values
     boolean enableSsl = config.getBoolean("SSL_ENABLED", false);
     String bindAddress = config.get("BIND_ADDRESS", "0.0.0.0");
-    int port = config.getInt("SERVER_PORT", enableSsl ? 443 : 80);
+    int port = config.getInt("SERVER_PORT", 15000);
     int idleTimeout = config.getInt("IDLE_TIMEOUT_SECONDS", 300);
     int maxContentLength = config.getInt("MAX_CONTENT_LENGTH", 10_485_760);
 

@@ -178,7 +178,7 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
     List<ComponentInfo> sorted = sort(components);
 
     StringBuilder sb = new StringBuilder();
-    sb.append("package nexus.generated;\n\n");
+    sb.append("package org.nexus.generated;\n\n");
     sb.append("import org.nexus.NexusDIRegistry;\n");
 
     // Import all component types
@@ -238,7 +238,8 @@ public final class DependencyInjectionProcessor extends AbstractProcessor {
     sb.append("}\n");
 
     // Write the file
-    JavaFileObject sourceFile = filer.createSourceFile("nexus.generated.GeneratedDIInitializer");
+    JavaFileObject sourceFile = filer.createSourceFile(
+        "org.nexus.generated.GeneratedDIInitializer");
     try (PrintWriter writer = new PrintWriter(sourceFile.openWriter())) {
       writer.write(sb.toString());
     }
