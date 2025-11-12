@@ -7,15 +7,16 @@ import javax.lang.model.element.VariableElement;
 import javax.tools.Diagnostic.Kind;
 import org.nexus.annotations.QueryParam;
 import org.nexus.annotations.RequestBody;
+import org.nexus.annotations.RequestContextParam;
 
 final class MappingParameterProcessor {
 
   private final ProcessingEnvironment processingEnv;
   private final StringBuilder paramCode = new StringBuilder();
   private final List<String> parameterNames = new ArrayList<>();
-  private final StringBuilder invokeArgs = new StringBuilder();
   private final List<String> placeholders;
   private final String endpoint;
+  private final String spacer = "  ";
   //private final ExecutableElement method;
   private int placeholderIndex = 0;
 
@@ -33,6 +34,15 @@ final class MappingParameterProcessor {
     String paramName = param.getSimpleName().toString();
     String typeName = param.asType().toString();
 
+    // Skip RequestContext parameters as they're handled separately
+    if (param.getAnnotation(RequestContextParam.class) != null) {
+      return;
+    }
+
+    // Add to parameter names
+    parameterNames.add(paramName);
+
+    // Process the parameter based on its annotation
     if (param.getAnnotation(RequestBody.class) != null) {
       processRequestBody(param);
     } else {
@@ -43,8 +53,6 @@ final class MappingParameterProcessor {
         processPathParam(param, paramName, typeName);
       }
     }
-
-    parameterNames.add(paramName);
   }
 
   private void processQueryParam(VariableElement param, QueryParam qp,
@@ -66,24 +74,24 @@ final class MappingParameterProcessor {
     String listRaw = "rc.getQueryParams(\"" + qpName + "\")";
     String tmpVar = paramName + "Raw";
 
-    paramCode.append("        ").append(listType).append(" ").append(paramName)
-        .append(" = new java.util.ArrayList<>();\n")
-        .append("        java.util.List<String> ").append(tmpVar)
-        .append(" = ").append(listRaw).append(";\n")
-        .append("        for (String v : ").append(tmpVar).append(") {\n");
+    paramCode.append(listType).append(" ").append(paramName)
+        .append(" = new java.util.ArrayList<>();")
+        .append(" java.util.List<String> ").append(tmpVar)
+        .append(" = ").append(listRaw).append(";")
+        .append(" for (String v : ").append(tmpVar).append(") {");
 
     switch (elemType) {
-      case MappingProcessorConstants.TYPE_INT -> paramCode.append("          ").append(paramName)
+      case MappingProcessorConstants.TYPE_INT -> paramCode.append(paramName)
           .append(".add(safeParseIntQuery(v, \"").append(qpName)
-          .append("\", \"").append(endpoint).append("\"));\n");
-      case MappingProcessorConstants.TYPE_LONG -> paramCode.append("          ").append(paramName)
+          .append("\", \"").append(endpoint).append("\"));");
+      case MappingProcessorConstants.TYPE_LONG -> paramCode.append(paramName)
           .append(".add(safeParseLongQuery(v, \"").append(qpName)
-          .append("\", \"").append(endpoint).append("\"));\n");
+          .append("\", \"").append(endpoint).append("\"));");
       default ->  // String
-          paramCode.append("          ").append(paramName).append(".add(v);\n");
+          paramCode.append(paramName).append(".add(v);");
     }
 
-    paramCode.append("        }\n");
+    paramCode.append(" }");
   }
 
   private void processScalarQueryParam(QueryParam qp, String qpName,
@@ -92,8 +100,8 @@ final class MappingParameterProcessor {
     String valueExpr = buildQueryParamValueExpression(qp, qpName, raw);
     String conversion = convertQueryParamValue(typeName, valueExpr, qpName);
 
-    paramCode.append("        ").append(typeName).append(" ").append(paramName)
-        .append(" = ").append(conversion).append(";\n");
+    paramCode.append(typeName).append(" ").append(paramName)
+        .append(" = ").append(conversion).append(";");
   }
 
   private void processRequestBody(VariableElement param) {
@@ -101,23 +109,22 @@ final class MappingParameterProcessor {
     String paramName = param.getSimpleName().toString();
 
     paramCode
-        .append(paramType).append(" ").append(paramName).append(";\n")
-        .append("        try {\n");
-    paramCode.append("          ").append(paramName)
-        .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);\n");
-    paramCode.append("        } catch (JsonProcessingException e) {\n");
-    paramCode.append("          throw new ProblemDetailsException(\n");
-    paramCode.append("            new ProblemDetails.Single(\n");
-    paramCode.append("              ProblemDetailsTypes.CLIENT_ERROR,\n");
-    paramCode.append("              \"Invalid request\",\n");
-    paramCode.append("              400,\n");
-    paramCode.append("              \"Invalid JSON request body: \" + e.getMessage(),\n");
-    paramCode.append("              \"\",\n");
-    paramCode.append("              Map.of()\n");
-    paramCode.append("            )\n");
-    paramCode.append("          );\n");
-    paramCode.append("        }\n");
-
+        .append(paramType).append(" ").append(paramName).append(";")
+        .append(" try {");
+    paramCode.append(paramName)
+        .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);");
+    paramCode.append(" } catch (JsonProcessingException e) {");
+    paramCode.append(" throw new ProblemDetailsException(");
+    paramCode.append(" new ProblemDetails.Single(");
+    paramCode.append(" ProblemDetailsTypes.CLIENT_ERROR,");
+    paramCode.append(" \"Invalid request\",");
+    paramCode.append(" 400,");
+    paramCode.append(" \"Invalid JSON request body: \" + e.getMessage(),");
+    paramCode.append(" \"\",");
+    paramCode.append(" Map.of()");
+    paramCode.append(" )");
+    paramCode.append(" );");
+    paramCode.append(" }");
   }
 
   private String buildQueryParamValueExpression(QueryParam qp, String qpName, String raw) {
@@ -155,8 +162,11 @@ final class MappingParameterProcessor {
     String conversion = convertPathParamValue(typeName, rawValue, placeholder);
 
     paramCode
+
         .append(typeName).append(" ").append(paramName).append(" = ").append(conversion)
-        .append(";\n");
+        .append(";")
+//        .append("\n")
+    ;
   }
 
   private String convertPathParamValue(String typeName, String rawValue, String placeholder) {
@@ -168,6 +178,17 @@ final class MappingParameterProcessor {
           "safeParseLong(" + rawValue + ", \"" + placeholder + "\", \"" + endpoint + "\")";
       default -> throw new IllegalArgumentException("Unsupported path parameter type: " + typeName);
     };
+  }
+
+  public void processRequestContextParam(VariableElement param, int paramIndex) {
+    String paramType = param.asType().toString();
+
+    if (!"org.nexus.RequestContext".equals(paramType)) {
+      return;
+    }
+
+    // Add to parameter names at the correct position
+    parameterNames.add(paramIndex, "rc");
   }
 
   String getParamCode() {

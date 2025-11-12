@@ -16,7 +16,7 @@ public class ApiRepository {
   private final NexusDatabase db;
 
   public ApiRepository() {
-    DatabaseConfig dbConfig = DatabaseConnectorFactory.getConfig("nexus-db-postgresql");
+    DatabaseConfig dbConfig = DatabaseConnectorFactory.getConfig("nexus-db-sqlite");
     DatabaseConnector connector = DatabaseConnectorFactory.create(dbConfig);
     this.db = new NexusDatabase(connector);
   }

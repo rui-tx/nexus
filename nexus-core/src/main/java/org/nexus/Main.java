@@ -16,6 +16,8 @@ import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
 import nexus.generated.GeneratedDIInitializer;
+import org.nexus.config.JwtService;
+import org.nexus.config.NexusJwt;
 import org.nexus.config.SslConfig;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
@@ -83,9 +85,13 @@ public class Main {
       }
     }
 
+    // Initialize JWT services
+    NexusJwt.initialize(config);
+    JwtService jwtService = NexusJwt.getInstance().getJwtService();
+
     Main app = new Main();
     try {
-      app.start(bindAddress, port, null, idleTimeout, maxContentLength, sslConfig);
+      app.start(bindAddress, port, null, idleTimeout, maxContentLength, sslConfig, jwtService);
       app.serverChannel.closeFuture().sync();
     } finally {
       app.stop();
@@ -123,7 +129,7 @@ public class Main {
    * @throws InterruptedException if the server is interrupted while starting
    */
   public void start(String bindAddress, int port, TestRouteRegistry testRoutes,
-      int idleTimeout, int maxContentLength, SslConfig sslConfig)
+      int idleTimeout, int maxContentLength, SslConfig sslConfig, JwtService jwtService)
       throws InterruptedException {
     this.bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
     this.workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
@@ -133,7 +139,8 @@ public class Main {
         new SecurityMiddleware(
             NexusConfig
                 .getInstance()
-                .getBoolean("SSL_ENABLED", false))
+                .getBoolean("SSL_ENABLED", false),
+            jwtService)
     );
 
     // Initialize dependency injection for controllers, services and repos
@@ -207,7 +214,7 @@ public class Main {
   // for tests
   public void start(int port, TestRouteRegistry testRoutes, int idleTimeout, int maxContentLength)
       throws InterruptedException {
-    start("0.0.0.0", port, testRoutes, idleTimeout, maxContentLength, null);
+    start("0.0.0.0", port, testRoutes, idleTimeout, maxContentLength, null, null);
   }
 
   public int getPort() {

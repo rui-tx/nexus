@@ -69,11 +69,11 @@ final class MappingProcessorUtils {
     }
 
     List<? extends TypeMirror> typeArgs = declaredType.getTypeArguments();
-    if (typeArgs.isEmpty() || !(typeArgs.get(0) instanceof DeclaredType responseType)) {
+    if (typeArgs.isEmpty() || !(typeArgs.getFirst() instanceof DeclaredType responseType)) {
       return "Object";
     }
 
     List<? extends TypeMirror> responseArgs = responseType.getTypeArguments();
-    return responseArgs.isEmpty() ? "Object" : responseArgs.get(0).toString();
+    return responseArgs.isEmpty() ? "Object" : responseArgs.getFirst().toString();
   }
 }

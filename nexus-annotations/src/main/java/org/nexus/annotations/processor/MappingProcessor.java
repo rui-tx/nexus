@@ -24,10 +24,13 @@ import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
+import org.nexus.annotations.RequestContextParam;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Mapping")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class MappingProcessor extends AbstractProcessor {
+
+  private final String spacer = "  ";
 
   private Filer filer;
   private Messager messager;
@@ -140,13 +143,12 @@ public final class MappingProcessor extends AbstractProcessor {
   private void generateRoutesFile(List<RouteInfo> routes) throws Exception {
     StringBuilder builder = new StringBuilder();
     builder.append(MappingProcessorConstants.GENERATED_CLASS_HEADER)
-        .append("\n")
         .append(MappingProcessorConstants.HELPER_METHODS)
-        .append("\n  private static void initRoutes() {\n");
+        .append("  private static void initRoutes() {\n");
 
     // Add route mappings
     for (RouteInfo route : routes) {
-      builder.append(generateRouteMapping(route));
+      builder.append(spacer.repeat(2)).append(generateRouteMapping(route)).append("\n");
     }
 
     builder.append("  }")
@@ -163,13 +165,17 @@ public final class MappingProcessor extends AbstractProcessor {
     String httpMethod = "HttpMethod." + route.mapping.type().name();
     String methodStr = route.mapping.type().name();
 
-    // Process parameters (unchanged)
     List<String> placeholders = MappingProcessorUtils.extractPlaceholders(endpoint);
     MappingParameterProcessor paramProcessor = new MappingParameterProcessor(
         processingEnv, placeholders, endpoint); //method
 
     List<? extends VariableElement> parameters = method.getParameters();
     for (int i = 0; i < parameters.size(); i++) {
+      if (parameters.get(i).getAnnotation(RequestContextParam.class) != null) {
+        paramProcessor.processRequestContextParam(parameters.get(i), i);
+        continue;
+      }
+
       paramProcessor.processParameter(parameters.get(i), i);
     }
 
@@ -179,9 +185,29 @@ public final class MappingProcessor extends AbstractProcessor {
 
     boolean isExact = placeholders.isEmpty();
 
+    StringBuilder sb1 = new StringBuilder();
+    sb1.append("new Route<%s>(%s, \"%s\", rc -> {")
+        .append("\n")
+        .append(spacer.repeat(7))
+        .append(
+            "%s  %s controller = org.nexus.NexusDIRegistry.getInstance()")
+        //.append(spacer.repeat(9))
+        .append(".get(%s.class);\n")
+        .append(spacer.repeat(7))
+        .append("try {\n")
+        .append(spacer.repeat(8))
+        .append("return controller.%s(%s);\n")
+        .append(spacer.repeat(7))
+        .append("} catch (Exception e) {\n")
+        .append(spacer.repeat(8))
+        .append("return CompletableFuture.failedFuture(e); }})")
+
+    ;
+
     String routeCreation = String.format(
-        "new Route<%s>(%s, \"%s\", rc -> {\n  %s\n  %s controller = org.nexus.NexusDIRegistry.getInstance().get(%s.class);\n  try {\n    return controller.%s(%s);\n  } catch (Exception e) {\n    return CompletableFuture.failedFuture(e);\n  }\n})",
-        responseType, httpMethod, endpoint, paramCode.isEmpty() ? "" : paramCode, className,
+        sb1.toString(),
+        responseType, httpMethod, endpoint,
+        paramCode.isEmpty() ? "" : paramCode, className,
         className, methodName, invokeArgs
     );
 
@@ -193,9 +219,18 @@ public final class MappingProcessor extends AbstractProcessor {
       );
     } else {
       // Dynamic route: Precompile and add to list
-      return String.format(
-          "dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>()).add(\n  new CompiledRoute(\n    CompiledPattern.compile(\"%s\"),\n    %s\n  )\n);\n",
-          methodStr, endpoint, routeCreation
+
+      StringBuilder sb2 = new StringBuilder();
+      sb2.append("dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>())")
+          .append("\n")
+          .append(spacer.repeat(4))
+          .append(".add(new CompiledRoute(CompiledPattern.compile(\"%s\"),")
+          .append("\n")
+          .append(spacer.repeat(6))
+          .append("%s));\n")
+      ;
+
+      return String.format(sb2.toString(), methodStr, endpoint, routeCreation
       );
     }
   }
