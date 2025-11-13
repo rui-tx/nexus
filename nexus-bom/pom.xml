@@ -20,6 +20,7 @@
     <postgresql-version>42.7.8</postgresql-version>
     <jsonwebtoken-version>0.11.5</jsonwebtoken-version>
     <nimbus-jose-jwt-version>10.6</nimbus-jose-jwt-version>
+    <avaje-inject-version>12.0</avaje-inject-version>
   </properties>
 
   <dependencyManagement>
@@ -99,6 +100,20 @@
         <groupId>com.nimbusds</groupId>
         <artifactId>nimbus-jose-jwt</artifactId>
         <version>${nimbus-jose-jwt-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.avaje</groupId>
+        <artifactId>avaje-inject</artifactId>
+        <version>${avaje-inject-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.avaje</groupId>
+        <artifactId>avaje-inject-generator</artifactId>
+        <version>${avaje-inject-version}</version>
+        <scope>provided</scope>
+        <optional>true</optional>
       </dependency>
     </dependencies>
   </dependencyManagement>

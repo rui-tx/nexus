@@ -18,7 +18,6 @@ import java.util.List;
 import org.nexus.config.SslConfig;
 import org.nexus.config.jwt.JwtService;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
-import org.nexus.generated.GeneratedDIInitializer;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
 import org.nexus.handlers.testing.TestRouterHandler;
@@ -51,7 +50,10 @@ public class Main {
 
     // Initialize configuration system
     NexusConfig config = NexusConfig.getInstance();
-    config.initialize(args);
+    config.init(args);
+
+    // Initialize dependency injection (avaje-inject)
+    NexusBeanScope.init();
 
     // Check for migration flag
     String runMigration = config.get("run-migration");
@@ -127,8 +129,14 @@ public class Main {
    * @param sslConfig        SSL configuration (null for HTTP)
    * @throws InterruptedException if the server is interrupted while starting
    */
-  public void start(String bindAddress, int port, TestRouteRegistry testRoutes,
-      int idleTimeout, int maxContentLength, SslConfig sslConfig, JwtService jwtService)
+  public void start(
+      String bindAddress,
+      int port,
+      TestRouteRegistry testRoutes,
+      int idleTimeout,
+      int maxContentLength,
+      SslConfig sslConfig,
+      JwtService jwtService)
       throws InterruptedException {
     this.bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
     this.workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
@@ -141,9 +149,6 @@ public class Main {
                 .getBoolean("SSL_ENABLED", false),
             jwtService)
     );
-
-    // Initialize dependency injection for controllers, services and repos
-    GeneratedDIInitializer.initialize();
 
     final boolean isSsl = sslConfig != null;
     if (isSsl) {
@@ -241,10 +246,18 @@ public class Main {
       workerGroup = null;
     }
 
+    // Close database connections
     try {
       DatabaseConnectorFactory.closeAll();
     } catch (Exception e) {
       LOGGER.error("Error closing database connections", e);
+    }
+
+    // Close DI scope
+    try {
+      NexusBeanScope.close();
+    } catch (Exception e) {
+      LOGGER.error("Error closing BeanScope", e);
     }
   }
 }

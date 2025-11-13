@@ -1,3 +1,2 @@
 org.nexus.annotations.processor.MappingProcessor
 org.nexus.annotations.processor.SecurityProcessor
-org.nexus.annotations.processor.DependencyInjectionProcessor

@@ -30,7 +30,7 @@ public final class NexusConfig {
     return instance;
   }
 
-  public synchronized void initialize(String[] args) {
+  public synchronized void init(String[] args) {
     if (initialized) {
       return;
     }

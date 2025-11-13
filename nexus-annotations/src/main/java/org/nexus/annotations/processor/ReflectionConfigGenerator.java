@@ -289,6 +289,17 @@ final class ReflectionConfigGenerator {
     if (entries.isEmpty()) {
       messager.printMessage(Kind.NOTE,
           "No types requiring reflection config found");
+
+      FileObject resource = filer.createResource(
+          StandardLocation.CLASS_OUTPUT,
+          "",
+          FILE_PATH
+      );
+
+      try (Writer writer = resource.openWriter()) {
+        writer.write("[]");
+      }
+
       return;
     }
 

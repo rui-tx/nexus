@@ -186,13 +186,10 @@ public final class MappingProcessor extends AbstractProcessor {
     boolean isExact = placeholders.isEmpty();
 
     StringBuilder sb1 = new StringBuilder();
-    sb1.append("new Route<%s>(%s, \"%s\", rc -> {")
-        .append("\n")
+    sb1.append("new Route<%s>(%s, \"%s\", rc -> {\n")
         .append(spacer.repeat(7))
-        .append(
-            "%s  %s controller = org.nexus.NexusDIRegistry.getInstance()")
-        //.append(spacer.repeat(9))
-        .append(".get(%s.class);\n")
+        .append(paramCode.isEmpty() ? "" : paramCode)
+        .append("%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n")
         .append(spacer.repeat(7))
         .append("try {\n")
         .append(spacer.repeat(8))
@@ -200,14 +197,14 @@ public final class MappingProcessor extends AbstractProcessor {
         .append(spacer.repeat(7))
         .append("} catch (Exception e) {\n")
         .append(spacer.repeat(8))
-        .append("return CompletableFuture.failedFuture(e); }})")
+        .append("return CompletableFuture.failedFuture(e); }})");
 
     ;
 
     String routeCreation = String.format(
         sb1.toString(),
         responseType, httpMethod, endpoint,
-        paramCode.isEmpty() ? "" : paramCode, className,
+        "", className,  // paramCode (handled above), className
         className, methodName, invokeArgs
     );
 

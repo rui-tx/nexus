@@ -1,16 +1,14 @@
 package org.nexus.repositories;
 
-import java.util.List;
+import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import org.nexus.NexusDatabase;
 import org.nexus.NexusExecutor;
-import org.nexus.annotations.Repository;
 import org.nexus.config.DatabaseConfig;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.interfaces.DatabaseConnector;
-import org.nexus.model.Test;
 
-@Repository
+@Singleton
 public class ApiRepository {
 
   private final NexusDatabase db;
@@ -37,13 +35,7 @@ public class ApiRepository {
     }, NexusExecutor.INSTANCE.get());
   }
 
-  public CompletableFuture<List<Test>> getDataSelect(String name) {
-    return CompletableFuture.supplyAsync(() -> {
-      return db.query(
-          "SELECT t.id, t.name FROM test t WHERE t.name = ? LIMIT 1000",
-          rs -> new Test(rs.getLong("id"), rs.getString("name")),
-          name
-      );
-    }, NexusExecutor.INSTANCE.get());
+  public record Test(long id, String name) {
+
   }
 }
