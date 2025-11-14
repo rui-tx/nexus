@@ -15,8 +15,8 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import java.net.InetSocketAddress;
 import java.util.List;
-import nexus.generated.GeneratedDIInitializer;
 import org.nexus.config.SslConfig;
+import org.nexus.config.jwt.JwtService;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.handlers.testing.TestRouteRegistry;
@@ -50,7 +50,10 @@ public class Main {
 
     // Initialize configuration system
     NexusConfig config = NexusConfig.getInstance();
-    config.initialize(args);
+    config.init(args);
+
+    // Initialize dependency injection (avaje-inject)
+    NexusBeanScope.init();
 
     // Check for migration flag
     String runMigration = config.get("run-migration");
@@ -64,7 +67,7 @@ public class Main {
     // Get and validate configuration values
     boolean enableSsl = config.getBoolean("SSL_ENABLED", false);
     String bindAddress = config.get("BIND_ADDRESS", "0.0.0.0");
-    int port = config.getInt("SERVER_PORT", enableSsl ? 443 : 80);
+    int port = config.getInt("SERVER_PORT", 15000);
     int idleTimeout = config.getInt("IDLE_TIMEOUT_SECONDS", 300);
     int maxContentLength = config.getInt("MAX_CONTENT_LENGTH", 10_485_760);
 
@@ -83,9 +86,13 @@ public class Main {
       }
     }
 
+    // Initialize JWT services
+    NexusJwt.initialize(config);
+    JwtService jwtService = NexusJwt.getInstance().getJwtService();
+
     Main app = new Main();
     try {
-      app.start(bindAddress, port, null, idleTimeout, maxContentLength, sslConfig);
+      app.start(bindAddress, port, null, idleTimeout, maxContentLength, sslConfig, jwtService);
       app.serverChannel.closeFuture().sync();
     } finally {
       app.stop();
@@ -122,8 +129,14 @@ public class Main {
    * @param sslConfig        SSL configuration (null for HTTP)
    * @throws InterruptedException if the server is interrupted while starting
    */
-  public void start(String bindAddress, int port, TestRouteRegistry testRoutes,
-      int idleTimeout, int maxContentLength, SslConfig sslConfig)
+  public void start(
+      String bindAddress,
+      int port,
+      TestRouteRegistry testRoutes,
+      int idleTimeout,
+      int maxContentLength,
+      SslConfig sslConfig,
+      JwtService jwtService)
       throws InterruptedException {
     this.bossGroup = new MultiThreadIoEventLoopGroup(1, NioIoHandler.newFactory());
     this.workerGroup = new MultiThreadIoEventLoopGroup(8, NioIoHandler.newFactory());
@@ -133,11 +146,9 @@ public class Main {
         new SecurityMiddleware(
             NexusConfig
                 .getInstance()
-                .getBoolean("SSL_ENABLED", false))
+                .getBoolean("SSL_ENABLED", false),
+            jwtService)
     );
-
-    // Initialize dependency injection for controllers, services and repos
-    GeneratedDIInitializer.initialize();
 
     final boolean isSsl = sslConfig != null;
     if (isSsl) {
@@ -207,7 +218,7 @@ public class Main {
   // for tests
   public void start(int port, TestRouteRegistry testRoutes, int idleTimeout, int maxContentLength)
       throws InterruptedException {
-    start("0.0.0.0", port, testRoutes, idleTimeout, maxContentLength, null);
+    start("0.0.0.0", port, testRoutes, idleTimeout, maxContentLength, null, null);
   }
 
   public int getPort() {
@@ -235,10 +246,18 @@ public class Main {
       workerGroup = null;
     }
 
+    // Close database connections
     try {
       DatabaseConnectorFactory.closeAll();
     } catch (Exception e) {
       LOGGER.error("Error closing database connections", e);
+    }
+
+    // Close DI scope
+    try {
+      NexusBeanScope.close();
+    } catch (Exception e) {
+      LOGGER.error("Error closing BeanScope", e);
     }
   }
 }

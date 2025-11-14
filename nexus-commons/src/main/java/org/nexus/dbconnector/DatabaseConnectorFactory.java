@@ -3,7 +3,7 @@ package org.nexus.dbconnector;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import org.nexus.NexusConfig;
-import org.nexus.config.DatabaseConfig;
+import org.nexus.config.db.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
 

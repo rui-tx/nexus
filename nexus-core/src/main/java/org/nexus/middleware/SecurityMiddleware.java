@@ -6,9 +6,10 @@ import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import nexus.generated.GeneratedSecurityRules;
+import org.nexus.GeneratedSecurityRules;
 import org.nexus.RequestContext;
 import org.nexus.SecurityRule;
+import org.nexus.config.jwt.JwtService;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
@@ -22,12 +23,15 @@ public class SecurityMiddleware implements Middleware {
   private static final Logger LOGGER = LoggerFactory.getLogger(SecurityMiddleware.class);
   private static final String AUTH_HEADER = "Authorization";
   private static final Set<String> EMPTY_SET = Collections.emptySet();
+
+  private final JwtService jwtService;
   private final boolean enforceHsts;
   private final boolean isHttps;
 
-  public SecurityMiddleware(boolean isHttps) {
+  public SecurityMiddleware(boolean isHttps, JwtService jwtService) {
     this.isHttps = isHttps;
     this.enforceHsts = isHttps;
+    this.jwtService = jwtService;
   }
 
   @Override
@@ -120,15 +124,29 @@ public class SecurityMiddleware implements Middleware {
     }
 
     String token = authHeader.substring(7);
-    if (!"valid".equals(token)) {
+    boolean isRefreshEndpoint = request.uri().endsWith("/refresh");
+
+    // Validate token type based on endpoint
+    boolean isValid = isRefreshEndpoint ?
+        jwtService.validateRefreshToken(token) :
+        jwtService.validateAccessToken(token);
+
+    if (!isValid) {
       return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
     }
 
-    // In a real application, validate the token and extract user roles/permissions
-    Set<String> userRoles = Set.of("admin");
-    Set<String> userPermissions = Set.of("read", "write");
+    try {
+      String username = jwtService.getSubjectFromToken(token, isRefreshEndpoint);
+      // Extract roles and permissions from token claims
+      // For now, using default values
+      Set<String> userRoles = Set.of("user");
+      Set<String> userPermissions = Set.of("read");
 
-    return new AuthResult(true, "user-id", userRoles, userPermissions);
+      return new AuthResult(true, username, userRoles, userPermissions);
+    } catch (Exception e) {
+      LOGGER.warn("Error processing JWT token", e);
+      return new AuthResult(false, null, EMPTY_SET, EMPTY_SET);
+    }
   }
 
   private void throwSecurityException(String title, String message, int status, String path) {

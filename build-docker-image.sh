@@ -59,7 +59,7 @@ EOF
 echo "Dockerfile generated with revision: $REVISION"
 
 # Build and tag
-podman build -t nexus:"$REVISION" .
+podman build --no-cache -t nexus:"$REVISION" .
 podman tag nexus:"$REVISION" nexus:latest
 
 echo "Image generated with revision: $REVISION"

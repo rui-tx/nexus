@@ -5,7 +5,7 @@ import com.zaxxer.hikari.HikariDataSource;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Objects;
-import org.nexus.config.DatabaseConfig;
+import org.nexus.config.db.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
 

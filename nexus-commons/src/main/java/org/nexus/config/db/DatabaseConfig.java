@@ -1,4 +1,4 @@
-package org.nexus.config;
+package org.nexus.config.db;
 
 import org.nexus.enums.DatabaseType;
 

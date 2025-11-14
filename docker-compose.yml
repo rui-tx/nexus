@@ -7,27 +7,27 @@ services:
     restart: unless-stopped
     volumes:
       - nexus-sqlite-vol:/app/db
-    depends_on:
-      database:
-        condition: service_healthy
+#    depends_on:
+#      database:
+#        condition: service_healthy
 
-  database:
-    image: "postgres:18.0"
-    container_name: nexus-db
-    ports:
-      - "5432:5432"
-    environment:
-      POSTGRES_USER: username
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: nexus-db
-    volumes:
-      - nexus-postgres-vol:/var/lib/postgresql
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+#  database:
+#    image: "postgres:18.0"
+#    container_name: nexus-db
+#    ports:
+#      - "5432:5432"
+#    environment:
+#      POSTGRES_USER: username
+#      POSTGRES_PASSWORD: password
+#      POSTGRES_DB: nexus-db
+#    volumes:
+#      - nexus-postgres-vol:/var/lib/postgresql
+#    healthcheck:
+#      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 5
 
 volumes:
   nexus-sqlite-vol:
-  nexus-postgres-vol:
+  #nexus-postgres-vol:

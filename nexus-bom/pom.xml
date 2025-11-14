@@ -18,6 +18,8 @@
     <hikaricp-version>7.0.2</hikaricp-version>
     <sqlite-jdbc-version>3.51.0.0</sqlite-jdbc-version>
     <postgresql-version>42.7.8</postgresql-version>
+    <nimbus-jose-jwt-version>10.6</nimbus-jose-jwt-version>
+    <avaje-inject-version>12.0</avaje-inject-version>
   </properties>
 
   <dependencyManagement>
@@ -69,10 +71,10 @@
       </dependency>
 
       <dependency>
-          <groupId>org.junit.jupiter</groupId>
-          <artifactId>junit-jupiter-api</artifactId>
-          <version>${junit-jupiter-api-version}</version>
-          <scope>test</scope>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit-jupiter-api-version}</version>
+        <scope>test</scope>
       </dependency>
 
       <dependency>
@@ -91,6 +93,26 @@
         <groupId>org.postgresql</groupId>
         <artifactId>postgresql</artifactId>
         <version>${postgresql-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>com.nimbusds</groupId>
+        <artifactId>nimbus-jose-jwt</artifactId>
+        <version>${nimbus-jose-jwt-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.avaje</groupId>
+        <artifactId>avaje-inject</artifactId>
+        <version>${avaje-inject-version}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>io.avaje</groupId>
+        <artifactId>avaje-inject-generator</artifactId>
+        <version>${avaje-inject-version}</version>
+        <scope>provided</scope>
+        <optional>true</optional>
       </dependency>
     </dependencies>
   </dependencyManagement>

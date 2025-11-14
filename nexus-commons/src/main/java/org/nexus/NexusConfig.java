@@ -7,7 +7,7 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
-import org.nexus.config.DatabaseConfig;
+import org.nexus.config.db.DatabaseConfig;
 import org.nexus.enums.DatabaseType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,7 +30,7 @@ public final class NexusConfig {
     return instance;
   }
 
-  public synchronized void initialize(String[] args) {
+  public synchronized void init(String[] args) {
     if (initialized) {
       return;
     }

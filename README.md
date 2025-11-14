@@ -15,7 +15,7 @@ Netty-based web server
 - Route table generated at build time
 - `reflection-config.json` automatically generated at build time for objects annotated with
   `@RequestBody` (GraalVM native image)
-- DI registry with @Controller, @Service, @Repository annotations built at build time
+- Dependency injection with [avaje inject](https://avaje.io/inject/)
 - Middleware system
 - Database system with HikariCP and JDBC
 
