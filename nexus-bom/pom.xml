@@ -18,7 +18,6 @@
     <hikaricp-version>7.0.2</hikaricp-version>
     <sqlite-jdbc-version>3.51.0.0</sqlite-jdbc-version>
     <postgresql-version>42.7.8</postgresql-version>
-    <jsonwebtoken-version>0.11.5</jsonwebtoken-version>
     <nimbus-jose-jwt-version>10.6</nimbus-jose-jwt-version>
     <avaje-inject-version>12.0</avaje-inject-version>
   </properties>
