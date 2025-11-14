@@ -31,7 +31,7 @@ RUN mvn compile -B
 # copy the rest of the source code
 COPY . .
 
-RUN mvn package -Pnative
+RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 
@@ -59,7 +59,7 @@ EOF
 echo "Dockerfile generated with revision: $REVISION"
 
 # Build and tag
-podman build -t nexus:"$REVISION" .
+podman build --no-cache -t nexus:"$REVISION" .
 podman tag nexus:"$REVISION" nexus:latest
 
 echo "Image generated with revision: $REVISION"

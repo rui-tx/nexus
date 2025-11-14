@@ -1,11 +1,13 @@
-package org.nexus.config.jwt;
+package org.nexus.beans.jwt;
 
 import io.avaje.inject.Bean;
 import io.avaje.inject.Factory;
 import org.nexus.NexusConfig;
+import org.nexus.config.jwt.JwtConfig;
+import org.nexus.config.jwt.JwtService;
 
 @Factory
-public class NexusJwtFactory {
+public class JwtFactory {
 
   @Bean
   public JwtService jwtService() {

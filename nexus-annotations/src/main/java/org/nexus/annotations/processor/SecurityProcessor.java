@@ -22,7 +22,7 @@ import org.nexus.annotations.Secured;
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class SecurityProcessor extends AbstractProcessor {
 
-  private static final String GENERATED_PACKAGE = "org.nexus.generated";
+  private static final String GENERATED_PACKAGE = "org.nexus";
   private static final String CONFIG_CLASS = "GeneratedSecurityRules";
 
   @Override

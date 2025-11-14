@@ -2,7 +2,7 @@ package org.nexus.annotations.processor;
 
 public final class MappingProcessorConstants {
 
-  public static final String GENERATED_PACKAGE = "org.nexus.generated";
+  public static final String GENERATED_PACKAGE = "org.nexus";
   public static final String GENERATED_FILE_NAME = "GeneratedRoutes";
   public static final String GENERATED_PACKAGE_FILE = GENERATED_PACKAGE + "." + GENERATED_FILE_NAME;
 

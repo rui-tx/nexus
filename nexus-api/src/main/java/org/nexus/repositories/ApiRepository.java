@@ -1,25 +1,22 @@
 package org.nexus.repositories;
 
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import org.nexus.NexusDatabase;
 import org.nexus.NexusExecutor;
-import org.nexus.config.DatabaseConfig;
-import org.nexus.dbconnector.DatabaseConnectorFactory;
-import org.nexus.interfaces.DatabaseConnector;
 
 @Singleton
 public class ApiRepository {
 
   private final NexusDatabase db;
 
-  public ApiRepository() {
-    DatabaseConfig dbConfig = DatabaseConnectorFactory.getConfig("nexus-db-sqlite");
-    DatabaseConnector connector = DatabaseConnectorFactory.create(dbConfig);
-    this.db = new NexusDatabase(connector);
+  @Inject
+  public ApiRepository(NexusDatabase db) {
+    this.db = db;
   }
 
-  public CompletableFuture<Integer> getData(String name) {
+  public CompletableFuture<Integer> getExample(String name) {
     return CompletableFuture.supplyAsync(() -> {
       db.insert(
           "INSERT INTO test (name) VALUES (?)",

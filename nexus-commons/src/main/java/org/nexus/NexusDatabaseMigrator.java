@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.nexus.config.DatabaseConfig;
+import org.nexus.config.db.DatabaseConfig;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;

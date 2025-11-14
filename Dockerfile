@@ -18,7 +18,7 @@ RUN mvn compile -B
 # copy the rest of the source code
 COPY . .
 
-RUN mvn package -Pnative
+RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 

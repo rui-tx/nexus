@@ -18,7 +18,7 @@ public class ApiService {
 
   // pre computed responses
   static {
-    NexusStaticResponseRegistry.register("heartbeat", "up", 200);
+    NexusStaticResponseRegistry.register("ping", "up", 200);
   }
 
   private final ApiRepository apiRepository;
@@ -29,8 +29,7 @@ public class ApiService {
   }
 
   public CompletableFuture<Response<String>> pong() {
-    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("heartbeat");
+    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("ping");
     return CompletableFuture.completedFuture(new CachedHttpResponse(preComputed));
   }
-
 }
