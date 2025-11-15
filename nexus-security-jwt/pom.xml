@@ -7,11 +7,10 @@
   <parent>
     <groupId>org.nexus</groupId>
     <artifactId>nexus</artifactId>
-    <version>${revision}</version>
+    <version>0.1-ALPHA-SNAPSHOT</version>
   </parent>
 
   <artifactId>nexus-security-jwt</artifactId>
-  <name>nexus-security-jwt</name>
   <packaging>jar</packaging>
 
   <dependencyManagement>

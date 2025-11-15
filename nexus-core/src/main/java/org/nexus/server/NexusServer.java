@@ -20,8 +20,6 @@ import java.util.concurrent.TimeUnit;
 import org.nexus.NexusBeanScope;
 import org.nexus.config.ServerConfig;
 import org.nexus.handlers.DefaultHttpServerHandler;
-import org.nexus.handlers.testing.TestRouteRegistry;
-import org.nexus.handlers.testing.TestRouterHandler;
 import org.nexus.interfaces.Middleware;
 import org.nexus.middleware.LoggingMiddleware;
 import org.slf4j.Logger;
@@ -33,8 +31,6 @@ public class NexusServer {
 
   private final ServerConfig config;
   private final List<Middleware> middlewares;
-  // For tests only: optional test route registry to short-circuit routing
-  private final TestRouteRegistry testRoutes;
   private EventLoopGroup bossGroup;
   private EventLoopGroup workerGroup;
   private Channel serverChannel;
@@ -50,7 +46,6 @@ public class NexusServer {
     defaults.add(new LoggingMiddleware());
 //    defaults.add(new SecurityMiddleware());
     this.middlewares = List.copyOf(defaults);
-    this.testRoutes = null;
     verifyRoutesAvailability();
   }
 
@@ -64,19 +59,6 @@ public class NexusServer {
     this.config = config;
     // Use exactly the provided list, caller decides whether to include defaults.
     this.middlewares = List.copyOf(middlewares);
-    this.testRoutes = null;
-    verifyRoutesAvailability();
-  }
-
-  /**
-   * Test-only constructor allowing injection of a test route registry that is evaluated before the
-   * normal router. Not intended for production use.
-   */
-  public NexusServer(ServerConfig config, List<Middleware> middlewares,
-      TestRouteRegistry testRoutes) {
-    this.config = config;
-    this.middlewares = List.copyOf(middlewares);
-    this.testRoutes = testRoutes;
     verifyRoutesAvailability();
   }
 
@@ -167,11 +149,6 @@ public class NexusServer {
         config.getIdleTimeoutSeconds(),
         java.util.concurrent.TimeUnit.SECONDS
     ));
-
-    // If test routes are provided (tests), short-circuit to them first
-    if (testRoutes != null && !testRoutes.routes().isEmpty()) {
-      p.addLast("test-router", new TestRouterHandler(testRoutes));
-    }
 
     // Add custom handlers with route resolution
     p.addLast(new DefaultHttpServerHandler(middlewares));
