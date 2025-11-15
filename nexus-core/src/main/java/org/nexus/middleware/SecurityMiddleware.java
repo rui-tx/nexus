@@ -6,9 +6,9 @@ import io.netty.handler.codec.http.HttpHeaders;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import org.nexus.GeneratedSecurityRules;
 import org.nexus.RequestContext;
 import org.nexus.SecurityRule;
+import org.nexus.SecurityResolver;
 import org.nexus.config.jwt.JwtService;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
@@ -47,7 +47,7 @@ public class SecurityMiddleware implements Middleware {
     }
 
     // Check authentication and authorization
-    SecurityRule rule = GeneratedSecurityRules.getRule(method, path);
+    SecurityRule rule = SecurityResolver.getRule(method, path);
     if (rule == null || rule.permitAll()) {
       chain.next(ctx);
       return;

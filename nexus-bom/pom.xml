@@ -49,6 +49,18 @@
       </dependency>
 
       <dependency>
+        <groupId>org.nexus</groupId>
+        <artifactId>nexus-security-jwt</artifactId>
+        <version>${revision}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.nexus</groupId>
+        <artifactId>nexus-database</artifactId>
+        <version>${revision}</version>
+      </dependency>
+
+      <dependency>
         <groupId>io.netty</groupId>
         <artifactId>netty-bom</artifactId>
         <version>${netty-version}</version>
@@ -73,6 +85,13 @@
       <dependency>
         <groupId>org.junit.jupiter</groupId>
         <artifactId>junit-jupiter-api</artifactId>
+        <version>${junit-jupiter-api-version}</version>
+        <scope>test</scope>
+      </dependency>
+
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter-engine</artifactId>
         <version>${junit-jupiter-api-version}</version>
         <scope>test</scope>
       </dependency>

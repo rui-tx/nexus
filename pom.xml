@@ -22,8 +22,9 @@
     <module>nexus-bom</module>
     <module>nexus-commons</module>
     <module>nexus-annotations</module>
-    <module>nexus-api</module>
     <module>nexus-core</module>
+    <module>nexus-security-jwt</module>
+    <module>nexus-database</module>
   </modules>
 
   <build>

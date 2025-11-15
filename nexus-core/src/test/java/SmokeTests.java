@@ -4,47 +4,43 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dto.ApiResponseDTO;
-import dto.PathParamRequestTestDTO;
-import dto.PathParamResponseTestDTO;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.concurrent.CompletableFuture;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.nexus.Main;
-import org.nexus.Response;
-import org.nexus.handlers.testing.TestRouteRegistry;
+import org.nexus.NexusBeanScope;
+import org.nexus.config.ServerConfig;
+import org.nexus.dto.ApiResponseDTO;
+import org.nexus.dto.PathParamResponseTestDTO;
+import org.nexus.middleware.LoggingMiddleware;
+import org.nexus.server.NexusServer;
 
 class SmokeTests {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
 
-  private Main server;
+  private NexusServer server;
   private HttpClient http;
   private String baseUrl;
 
   @BeforeEach
   void setUp() throws Exception {
-    // note: the tests CAN reach the GeneratedRoutes table, these routes just have priority
-    var testRoutes = new TestRouteRegistry()
-        .get("/found", _ ->
-            CompletableFuture.completedFuture(new Response<>(200, "found")))
-        .get("/throw", _ ->
-            CompletableFuture.failedFuture(new RuntimeException("boom")))
-        .get("/path/:foo/:bar", rc -> {
-          int foo = Integer.parseInt(rc.getPathParams().get("foo"));
-          String bar = rc.getPathParams().get("bar");
-          return CompletableFuture.completedFuture(
-              new Response<>(200, new PathParamRequestTestDTO(foo, bar))
-          );
-        });
+    // Initialize DI scope (no beans required but NexusServer expects BeanScope)
+    NexusBeanScope.init();
 
-    server = new Main();
-    server.start(0, testRoutes, 300, 1024); // <-- inject the test route handler
+    ServerConfig cfg = ServerConfig.builder()
+        .bindAddress("127.0.0.1")
+        .port(0)
+        .idleTimeoutSeconds(300)
+        .maxContentLength(1_048_576)
+        .build();
+
+    server = new NexusServer(cfg, List.of(new LoggingMiddleware()));
+    server.start();
     baseUrl = "http://127.0.0.1:" + server.getPort();
     http = HttpClient.newHttpClient();
   }
@@ -81,7 +77,7 @@ class SmokeTests {
 
   @Test
   void sentCorrectPathParams_returns200() throws Exception {
-    Integer pathParam1 = 1;
+    int pathParam1 = 1;
     String pathParam2 = "john";
 
     HttpResponse<String> res = http.send(
@@ -100,7 +96,7 @@ class SmokeTests {
 
     assertEquals(200, api.status);
     assertNotNull(api.date);
-    assertEquals(pathParam1, api.data.foo);
-    assertEquals(pathParam2, api.data.bar);
+    assertEquals(pathParam1, api.data.pathParam1());
+    assertEquals(pathParam2, api.data.pathParam2());
   }
 }

@@ -31,11 +31,12 @@ public final class MappingProcessorConstants {
       import org.nexus.PathMatcher.CompiledPattern;
       import org.nexus.PathMatcher.Result;
       import org.nexus.Route;
+      import org.nexus.RoutesResolver;
       import org.nexus.enums.ProblemDetailsTypes;
       import org.nexus.exceptions.ProblemDetailsException;
       import org.nexus.interfaces.ProblemDetails;
       
-      public final class %s {
+      public final class %s implements RoutesResolver.RoutesProvider {
       
         private static final Map<String, Route<?>> exactRoutes = new HashMap<>();
         private static final Map<String, List<CompiledRoute>> dynamicRoutesByMethod = new HashMap<>();
@@ -145,7 +146,7 @@ public final class MappingProcessorConstants {
   public static final String GENERATED_CLASS_FOOTER = """
       
       
-        public static RouteMatch findMatchingRoute(String httpMethod, String path) {
+        public static RouteMatch findMatchingRouteInternal(String httpMethod, String path) {
           String normPath = PathMatcher.normalise(path);
           String key = httpMethod.toUpperCase() + " " + normPath;
           Route<?> exact = exactRoutes.get(key);
@@ -185,6 +186,13 @@ public final class MappingProcessorConstants {
       
         public record RouteMatch(Route<?> route, Map<String, String> params) {
       
+        }
+
+        // Instance wrapper to satisfy RoutesResolver.RoutesProvider without reflection
+        @Override
+        public RoutesResolver.RouteMatch findMatchingRoute(String method, String path) {
+          RouteMatch m = findMatchingRouteInternal(method, path);
+          return (m == null) ? null : new RoutesResolver.RouteMatch(m.route(), m.params());
         }
       }
       """;

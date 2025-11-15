@@ -22,6 +22,8 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
 import javax.tools.JavaFileObject;
+import javax.tools.FileObject;
+import javax.tools.StandardLocation;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
 import org.nexus.annotations.RequestContextParam;
@@ -53,7 +55,19 @@ public final class MappingProcessor extends AbstractProcessor {
 
     Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(Mapping.class);
     if (annotatedElements.isEmpty()) {
-      return false;
+      try {
+        // Generate an empty routes file so runtime can rely on its presence
+        generateRoutesFile(List.of());
+        writeServiceProvider();
+        // Write (possibly empty) reflection config so native builds remain consistent
+        reflectionConfigGenerator.writeConfig();
+        hasGenerated = true;
+        messager.printMessage(Kind.NOTE, "No @Mapping found. Generated default GeneratedRoutes.");
+        return true;
+      } catch (Exception e) {
+        messager.printMessage(Kind.ERROR, "Failed to generate default routes: " + e.getMessage());
+        return false;
+      }
     }
 
     try {
@@ -109,6 +123,7 @@ public final class MappingProcessor extends AbstractProcessor {
 
     // Second pass: generate code
     generateRoutesFile(routes);
+    writeServiceProvider();
 
     // Third pass: generate reflection config
     reflectionConfigGenerator.writeConfig();
@@ -241,6 +256,18 @@ public final class MappingProcessor extends AbstractProcessor {
     messager.printMessage(
         Kind.NOTE,
         MappingProcessorConstants.GENERATED_FILE_NAME + ".java created successfully");
+  }
+
+  /**
+   * Writes the ServiceLoader provider configuration so core can load the generated class without reflection.
+   */
+  private void writeServiceProvider() throws Exception {
+    String servicePath = "META-INF/services/org.nexus.RoutesResolver$RoutesProvider";
+    FileObject fo = filer.createResource(StandardLocation.CLASS_OUTPUT, "", servicePath);
+    try (PrintWriter w = new PrintWriter(fo.openWriter())) {
+      w.println(MappingProcessorConstants.GENERATED_PACKAGE_FILE);
+    }
+    messager.printMessage(Kind.NOTE, "Service provider written: " + servicePath);
   }
 
   private record RouteInfo(ExecutableElement method, Mapping mapping) {
