@@ -19,6 +19,7 @@ public final class NexusConfig {
   private final Map<String, String> config = new HashMap<>();
   private final Map<String, DatabaseConfig> databaseConfigs = new HashMap<>();
   private boolean initialized = false;
+  private String envFilePath = ".env"; // Default path
 
   private NexusConfig() {
   }
@@ -30,6 +31,16 @@ public final class NexusConfig {
     return instance;
   }
 
+  /**
+   * Sets the .env file path (for testing purposes). Must be called before init().
+   */
+  public void setEnvFilePath(String path) {
+    if (initialized) {
+      throw new IllegalStateException("Cannot change env file path after initialization");
+    }
+    this.envFilePath = path;
+  }
+
   public synchronized void init(String[] args) {
     if (initialized) {
       return;
@@ -39,7 +50,7 @@ public final class NexusConfig {
 
     config.putAll(System.getenv());
     LOGGER.debug("Loaded {} system environment variables", config.size());
-    loadEnvFile(".env");
+    loadEnvFile(envFilePath);
     parseCommandLineArgs(args);
 
     // load database configurations
@@ -180,10 +191,5 @@ public final class NexusConfig {
       LOGGER.warn("Invalid long value for '{}', using default: {}", key, defaultValue);
       return defaultValue;
     }
-  }
-
-  // For debugging and testing
-  Map<String, String> getAll() {
-    return new HashMap<>(config);
   }
 }
