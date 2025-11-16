@@ -16,6 +16,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import org.nexus.dto.test.UserResponseDTO;
 import org.nexus.server.NexusServer;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("Nexus Core Smoke Tests")
 class SmokeTests {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -66,6 +68,7 @@ class SmokeTests {
 
   @Test
   @Order(1)
+  @DisplayName("Should return 200 for a existing endpoint")
   void found_returns200() throws Exception {
     HttpResponse<String> res = http.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/found")).GET().build(),
@@ -76,6 +79,7 @@ class SmokeTests {
 
   @Test
   @Order(2)
+  @DisplayName("Should return 404 for a non-existing endpoint")
   void notFound_returns404() throws Exception {
     HttpResponse<String> res = http.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/not-found")).GET().build(),
@@ -85,6 +89,7 @@ class SmokeTests {
 
   @Test
   @Order(3)
+  @DisplayName("Should return 500 for an unexcepted error")
   void unexpectedException_returns500() throws Exception {
     HttpResponse<String> res = http.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/throw")).GET().build(),
@@ -94,31 +99,7 @@ class SmokeTests {
 
   @Test
   @Order(4)
-  void sentCorrectPathParams_returns200() throws Exception {
-    int pathParam1 = 1;
-    String pathParam2 = "john";
-
-    HttpResponse<String> res = http.send(
-        HttpRequest.newBuilder(
-                URI.create(baseUrl + "/path/%d/%s".formatted(pathParam1, pathParam2)))
-            .GET()
-            .build(),
-        HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, res.statusCode());
-
-    JavaType javaType = MAPPER
-        .getTypeFactory()
-        .constructParametricType(ApiResponseDTO.class, PathParamResponseTestDTO.class);
-    ApiResponseDTO<PathParamResponseTestDTO> api = MAPPER.readValue(res.body(), javaType);
-
-    assertEquals(200, api.status);
-    assertNotNull(api.date);
-    assertEquals(pathParam1, api.data.pathParam1());
-    assertEquals(pathParam2, api.data.pathParam2());
-  }
-
-  @Test
-  @Order(5)
+  @DisplayName("Should return 200 when sending a single correct path parameter")
   void queryParam_singleParam_returns200() throws Exception {
     String name = "testUser";
     String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
@@ -146,7 +127,34 @@ class SmokeTests {
   }
 
   @Test
+  @Order(5)
+  @DisplayName("Should return 200 when sending correct path parameters")
+  void sentCorrectPathParams_returns200() throws Exception {
+    int pathParam1 = 1;
+    String pathParam2 = "john";
+
+    HttpResponse<String> res = http.send(
+        HttpRequest.newBuilder(
+                URI.create(baseUrl + "/path/%d/%s".formatted(pathParam1, pathParam2)))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, res.statusCode());
+
+    JavaType javaType = MAPPER
+        .getTypeFactory()
+        .constructParametricType(ApiResponseDTO.class, PathParamResponseTestDTO.class);
+    ApiResponseDTO<PathParamResponseTestDTO> api = MAPPER.readValue(res.body(), javaType);
+
+    assertEquals(200, api.status);
+    assertNotNull(api.date);
+    assertEquals(pathParam1, api.data.pathParam1());
+    assertEquals(pathParam2, api.data.pathParam2());
+  }
+
+  @Test
   @Order(6)
+  @DisplayName("Should return 200 when sending multiple query parameters")
   void queryParam_multipleParams_returns200() throws Exception {
     String name = "testUser";
     int age = 30;
@@ -184,6 +192,7 @@ class SmokeTests {
 
   @Test
   @Order(7)
+  @DisplayName("Should return 200 when sending optional query parameters")
   void queryParam_optionalParams_returns200() throws Exception {
     String required = "requiredValue";
 
@@ -214,6 +223,7 @@ class SmokeTests {
 
   @Test
   @Order(8)
+  @DisplayName("Should return 200 when sending valid JSON body")
   void jsonBody_validJson_returns200() throws Exception {
     Map<String, Object> requestBody = new HashMap<>();
     requestBody.put("name", "testUser");
@@ -249,6 +259,7 @@ class SmokeTests {
 
   @Test
   @Order(9)
+  @DisplayName("Should return 200 when sending raw text body")
   void echoBody_rawText_returns200() throws Exception {
     String requestText = "This is a raw text request body";
     String requestBody = "\"" + requestText + "\"";
@@ -278,6 +289,7 @@ class SmokeTests {
 
   @Test
   @Order(10)
+  @DisplayName("Should return 200 when sending valid request DTO")
   void validateBody_validRequest_returns200() throws Exception {
     UserResponseDTO requestBody = new UserResponseDTO();
     requestBody.setUsername("testuser");
@@ -310,6 +322,7 @@ class SmokeTests {
 
   @Test
   @Order(11)
+  @DisplayName("Should return 400 when sending bad body")
   void validateBody_missingUsername_returns400() throws Exception {
     // Create a map directly since the controller expects a Map, not a DTO
     Map<String, String> requestBody = new HashMap<>();
@@ -343,6 +356,7 @@ class SmokeTests {
 
   @Test
   @Order(12)
+  @DisplayName("Should return 400 when sending empty body")
   void validateBody_emptyBody_returns400() throws Exception {
     // Send a request with an empty body
     HttpResponse<String> response = http.send(
