@@ -108,23 +108,36 @@ final class MappingParameterProcessor {
     String paramType = param.asType().toString();
     String paramName = param.getSimpleName().toString();
 
-    paramCode
-        .append(paramType).append(" ").append(paramName).append(";")
-        .append(" try {");
-    paramCode.append(paramName)
-        .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);");
-    paramCode.append(" } catch (JsonProcessingException e) {");
-    paramCode.append(" throw new ProblemDetailsException(");
-    paramCode.append(" new ProblemDetails.Single(");
-    paramCode.append(" ProblemDetailsTypes.CLIENT_ERROR,");
-    paramCode.append(" \"Invalid request\",");
-    paramCode.append(" 400,");
-    paramCode.append(" \"Invalid JSON request body: \" + e.getMessage(),");
-    paramCode.append(" \"\",");
-    paramCode.append(" Map.of()");
-    paramCode.append(" )");
-    paramCode.append(" );");
-    paramCode.append(" }");
+    // For generic types, we need to use TypeReference to properly handle type erasure
+    if (paramType.contains("<")) {
+      // For generic types, use TypeReference
+      String typeRef = "new com.fasterxml.jackson.core.type.TypeReference<" + paramType + ">() {}";
+      paramCode
+          .append(paramType).append(" ").append(paramName).append(";")
+          .append(" try {")
+          .append(paramName)
+          .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(typeRef).append(");");
+    } else {
+      // For non-generic types, we can use .class
+      paramCode
+          .append(paramType).append(" ").append(paramName).append(";")
+          .append(" try {")
+          .append(paramName)
+          .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);");
+    }
+    
+    paramCode.append(" } catch (JsonProcessingException e) {")
+        .append(" throw new ProblemDetailsException(")
+        .append(" new ProblemDetails.Single(")
+        .append(" ProblemDetailsTypes.CLIENT_ERROR,")
+        .append(" \"Invalid request\",")
+        .append(" 400,")
+        .append(" \"Invalid JSON request body: \" + e.getMessage(),")
+        .append(" \"\",")
+        .append(" Map.of()")
+        .append(" )")
+        .append(" );")
+        .append(" }");
   }
 
   private String buildQueryParamValueExpression(QueryParam qp, String qpName, String raw) {

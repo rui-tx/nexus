@@ -1,7 +1,9 @@
 package org.nexus.dto;
 
-public class ApiResponseDTO<T> {
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
+public class ApiResponseDTO<T> {
   public String date;
   public int status;
   public T data;

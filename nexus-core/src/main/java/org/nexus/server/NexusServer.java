@@ -147,7 +147,7 @@ public class NexusServer {
         config.getIdleTimeoutSeconds(),
         config.getIdleTimeoutSeconds(),
         config.getIdleTimeoutSeconds(),
-        java.util.concurrent.TimeUnit.SECONDS
+        TimeUnit.SECONDS
     ));
 
     // Add custom handlers with route resolution
