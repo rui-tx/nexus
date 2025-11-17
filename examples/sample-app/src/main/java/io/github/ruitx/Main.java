@@ -1,20 +1,11 @@
 package io.github.ruitx;
 
-import java.util.List;
-import org.nexus.NexusBeanScope;
-import org.nexus.config.ServerConfig;
-import org.nexus.server.NexusServer;
+import org.nexus.NexusApplication;
 
-public class Main {
-  static void main() throws Exception {
-    NexusBeanScope.init();
+public class Main extends NexusApplication {
 
-    ServerConfig cfg = ServerConfig.builder()
-        .idleTimeoutSeconds(300)
-        .maxContentLength(1_048_576)
-        .build();
-
-    NexusServer server = new NexusServer(cfg, List.of());
-    server.startAndAwait();
+  static void main(String[] args) {
+    Main app = new Main();
+    app.run(args);
   }
 }

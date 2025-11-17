@@ -14,6 +14,7 @@
     <description>Example application using Nexus Framework</description>
 
     <properties>
+        <revision>1.0.0-SNAPSHOT</revision>
         <java.version>25</java.version>
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
@@ -38,6 +39,14 @@
         <artifactId>nexus-starter</artifactId>
       </dependency>
     </dependencies>
+
+    <repositories>
+        <repository>
+            <id>local-nexus</id>
+            <name>Local Nexus Repository</name>
+            <url>file://${project.basedir}/lib/maven-repo</url>
+        </repository>
+    </repositories>
 
    <build>
      <plugins>

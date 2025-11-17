@@ -1,29 +1,37 @@
 #!/bin/sh
 
-# Extract the revision from pom.xml
-REVISION=$(sed -n 's:.*<revision>\(.*\)</revision>.*:\1:p' pom.xml | head -n 1)
+# Extract the main project version from pom.xml
+VERSION=$(sed -n 's:.*<version>\(.*\)</version>.*:\1:p' pom.xml | head -n 1)
 
-# Check if revision was found
-if [ -z "$REVISION" ]; then
-  echo "Revision not found in pom.xml"
+if [ -z "$VERSION" ]; then
+  echo "Version not found in pom.xml"
   exit 1
 fi
 
-# Generate Dockerfile with dynamic binary name
+BINARY_NAME="nexus-sample-app-$VERSION"
+ARTIFACT_ID="nexus-sample-app"
+M2_REPO_BASE="$HOME/.m2/repository"
+TEMP_CACHE_DIR=".m2_local_cache"
+
+echo "Preparing local Maven artifacts for Docker build..."
+mkdir -p $TEMP_CACHE_DIR
+
+cp -R $M2_REPO_BASE/org $TEMP_CACHE_DIR/
+cp -R $M2_REPO_BASE/io $TEMP_CACHE_DIR/
+
+
+# Generate Dockerfile
 cat > Dockerfile <<EOF
 FROM vegardit/graalvm-maven:latest-java25 as builder
 
 WORKDIR /app
 
-# Copy parent pom
+# Copy pom.xml
 COPY pom.xml .
 
-# Copy all module pom.xml files
-COPY nexus-bom/pom.xml nexus-bom/
-COPY nexus-commons/pom.xml nexus-commons/
-COPY nexus-annotations/pom.xml nexus-annotations/
-COPY nexus-api/pom.xml nexus-api/
-COPY nexus-core/pom.xml nexus-core/
+# .m2 copy
+COPY $TEMP_CACHE_DIR/org /root/.m2/repository/org
+COPY $TEMP_CACHE_DIR/io /root/.m2/repository/io
 
 # download dependencies, this layer will be cached
 RUN mvn compile -B
@@ -31,39 +39,44 @@ RUN mvn compile -B
 # copy the rest of the source code
 COPY . .
 
+# Run native compilation
 RUN mvn package -Pnative -DskipTests
 
 FROM debian:bookworm-slim
 
-LABEL org.nexus.image.version="$REVISION"
+LABEL io.github.ruitx.nexus-sample-app.version="$VERSION"
 
 WORKDIR /app
 
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    vim \
-    htop \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/nexus-core/target/native/nexus-$REVISION /app/nexus
+# Copy the built native executable from the builder stage
+COPY --from=builder /app/target/native/$BINARY_NAME /app/$ARTIFACT_ID
 COPY --from=builder /app/.env /app/.env
 COPY --from=builder /app/migrations /app/migrations
 
-RUN chmod +x /app/nexus
+# Set executable permission
+RUN chmod +x /app/$ARTIFACT_ID
 
 EXPOSE 15000
 
-ENTRYPOINT ["/app/nexus"]
+ENTRYPOINT ["/app/$ARTIFACT_ID"]
 EOF
 
-echo "Dockerfile generated with revision: $REVISION"
+echo "Dockerfile generated with version: $VERSION"
 
 # Build and tag
-podman build --no-cache -t nexus:"$REVISION" .
-podman tag nexus:"$REVISION" nexus:latest
+podman build --no-cache -t nexus-sample-app:"$VERSION" .
+podman tag nexus-sample-app:"$VERSION" nexus-sample-app:latest
 
-echo "Image generated with revision: $REVISION"
+echo "Image generated with version: $VERSION"
+
+# Clean up the temporary cache directory after the build is done
+rm -rf $TEMP_CACHE_DIR
 
 # Optional: push to registry
-# podman tag localhost/nexus:$REVISION docker.io/yourusername/nexus:$REVISION
-# podman push docker.io/yourusername/nexus:$REVISION
+# podman tag localhost/nexus-sample-app:$REVISION docker.io/yourusername/nexus-sample-app:$REVISION
+# podman push docker.io/yourusername/nexus-sample-app:$REVISION
