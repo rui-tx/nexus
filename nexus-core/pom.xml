@@ -30,6 +30,11 @@
       <groupId>org.nexus</groupId>
       <artifactId>nexus-commons</artifactId>
     </dependency>
+    
+    <dependency>
+      <groupId>org.nexus</groupId>
+      <artifactId>nexus-database</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>io.netty</groupId>

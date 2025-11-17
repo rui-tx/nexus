@@ -1,5 +1,4 @@
-package org.nexus;
-
+import org.nexus.NexusConfig;
 import org.nexus.config.jwt.JwtConfig;
 import org.nexus.config.jwt.JwtService;
 

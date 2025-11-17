@@ -1,5 +1,3 @@
-package org.nexus.beans.jwt;
-
 import io.avaje.inject.Bean;
 import io.avaje.inject.Factory;
 import org.nexus.NexusConfig;
