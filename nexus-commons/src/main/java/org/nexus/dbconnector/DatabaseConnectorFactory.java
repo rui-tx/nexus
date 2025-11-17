@@ -53,6 +53,19 @@ public final class DatabaseConnectorFactory {
     return connectorCache.computeIfAbsent(config.name(), k -> createNewConnector(config));
   }
 
+  /**
+   * Create a new, non-cached database connector. Useful for migrations or temporary connections.
+   *
+   * @param config The database configuration
+   * @return A new DatabaseConnector instance (not cached)
+   */
+  public static DatabaseConnector createNonCached(DatabaseConfig config) {
+    if (config == null) {
+      throw new IllegalArgumentException("Database configuration cannot be null");
+    }
+    return createNewConnector(config);
+  }
+
   private static DatabaseConnector createNewConnector(DatabaseConfig config) {
     try {
       return switch (config.type()) {

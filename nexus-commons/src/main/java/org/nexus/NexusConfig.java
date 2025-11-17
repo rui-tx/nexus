@@ -31,6 +31,15 @@ public final class NexusConfig {
     return instance;
   }
 
+  public static synchronized void closeInstance() {
+    if (instance != null) {
+      instance.config.clear();
+      instance.databaseConfigs.clear();
+      instance.initialized = false;  // Reset the flag
+      instance = null;
+    }
+  }
+
   /**
    * Sets the .env file path (for testing purposes). Must be called before init().
    */

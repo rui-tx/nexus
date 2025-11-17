@@ -29,7 +29,6 @@ public class NexusDatabaseMigrator {
         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
       """.formatted(MIGRATION_TABLE);
-  private static final NexusConfig config = NexusConfig.getInstance();
 
   public NexusDatabaseMigrator() {
   }
@@ -40,6 +39,7 @@ public class NexusDatabaseMigrator {
    * @param specificDbName Optional specific DB name to migrate; null for all
    */
   public void migrateAll(String specificDbName) {
+    NexusConfig config = NexusConfig.getInstance();
     Map<String, DatabaseConfig> dbConfigs = config.getAllDatabaseConfigs();
     if (specificDbName != null) {
       DatabaseConfig dbConfig = dbConfigs.get(specificDbName);
@@ -56,6 +56,7 @@ public class NexusDatabaseMigrator {
   }
 
   private void migrateSingle(DatabaseConfig dbConfig) {
+    NexusConfig config = NexusConfig.getInstance();
     String dbName = dbConfig.name();
     LOGGER.info("Starting migrations for database: {}", dbName);
 
@@ -74,7 +75,7 @@ public class NexusDatabaseMigrator {
           + migrationsPath.toAbsolutePath());
     }
 
-    try (DatabaseConnector connector = DatabaseConnectorFactory.create(dbConfig)) {
+    try (DatabaseConnector connector = DatabaseConnectorFactory.createNonCached(dbConfig)) {
       NexusDatabase db = new NexusDatabase(connector);
       ensureMigrationTableExists(db);
       List<Path> migrationFiles = loadMigrationFiles(migrationsPath);
