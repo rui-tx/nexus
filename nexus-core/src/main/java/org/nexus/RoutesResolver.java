@@ -1,27 +1,31 @@
 package org.nexus;
 
-import java.util.ServiceLoader;
 import java.util.Map;
+import java.util.ServiceLoader;
 
 /**
- * RoutesResolver provides a stable indirection layer for resolving routes
- * without a direct compile-time dependency on the GeneratedRoutes class.
- *
- * The user application (or any module that uses @Mapping) will generate
- * org.nexus.GeneratedRoutes at compile-time. This resolver will use
- * ServiceLoader to load RoutesProvider at runtime.
+ * RoutesResolver provides a stable indirection layer for resolving routes without a direct
+ * compile-time dependency on the GeneratedRoutes class.
+ * </p>
+ * The user application (or any module that uses @Mapping) will generate org.nexus.GeneratedRoutes
+ * at compile-time. This resolver will use ServiceLoader to load RoutesProvider at runtime.
  */
 public final class RoutesResolver {
 
   private static volatile RoutesProvider provider;
 
-  private RoutesResolver() { }
+  private RoutesResolver() {
+  }
 
   private static RoutesProvider load() {
     RoutesProvider p = provider;
-    if (p != null) return p;
+    if (p != null) {
+      return p;
+    }
     synchronized (RoutesResolver.class) {
-      if (provider != null) return provider;
+      if (provider != null) {
+        return provider;
+      }
       ServiceLoader<RoutesProvider> loader = ServiceLoader.load(RoutesProvider.class);
       for (RoutesProvider rp : loader) {
         provider = rp;
@@ -37,8 +41,11 @@ public final class RoutesResolver {
   }
 
   public interface RoutesProvider {
+
     RouteMatch findMatchingRoute(String method, String path);
   }
 
-  public record RouteMatch(Route<?> route, Map<String, String> params) { }
+  public record RouteMatch(Route<?> route, Map<String, String> params) {
+
+  }
 }

@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.List;
@@ -29,14 +28,13 @@ class NexusDatabaseTest {
 
   private NexusDatabase database;
   private SqliteConnector connector;
-  private Path dbFile;
 
   @BeforeEach
-  void setUp() throws IOException {
-    dbFile = tempDir.resolve("test.db");
+  void setUp() {
+    Path dbFile = tempDir.resolve("test.db");
 
     DatabaseConfig config = DatabaseConfig.defaultConfig("test", DatabaseType.SQLITE)
-        .withUrl("jdbc:sqlite:" + dbFile.toString())
+        .withUrl("jdbc:sqlite:" + dbFile)
         .withPoolSize(5)
         .withAutoCommit(true);
 
@@ -126,8 +124,8 @@ class NexusDatabaseTest {
 
       // Then
       assertEquals(1, users.size());
-      assertEquals("Bob", users.get(0).name());
-      assertEquals(30, users.get(0).age());
+      assertEquals("Bob", users.getFirst().name());
+      assertEquals(30, users.getFirst().age());
     }
 
     @Test
@@ -242,7 +240,7 @@ class NexusDatabaseTest {
               rs.getString("email"), rs.getInt("age"))
       );
       assertEquals(1, users.size());
-      assertEquals("Alice", users.get(0).name());
+      assertEquals("Alice", users.getFirst().name());
     }
 
     @Test
@@ -295,7 +293,7 @@ class NexusDatabaseTest {
               rs.getString("email"), rs.getInt("age"))
       );
       assertEquals(1, users.size());
-      assertEquals("Bob", users.get(0).name());
+      assertEquals("Bob", users.getFirst().name());
     }
 
     @Test
@@ -410,7 +408,7 @@ class NexusDatabaseTest {
               rs.getString("email"), rs.getInt("age"))
       );
       assertEquals(1, users.size());
-      assertEquals("Charlie", users.get(0).name());
+      assertEquals("Charlie", users.getFirst().name());
     }
 
     @Test
@@ -474,10 +472,11 @@ class NexusDatabaseTest {
     @DisplayName("Should throw DatabaseException on invalid SQL")
     void testInvalidSql() {
       // When/Then
-      assertThrows(DatabaseException.class, () -> {
-        database.query("SELECT * FROM nonexistent_table",
-            rs -> rs.getString(1));
-      });
+      assertThrows(
+          DatabaseException.class,
+          () -> database.query("SELECT * FROM nonexistent_table",
+              rs -> rs.getString(1))
+      );
     }
 
     @Test
@@ -488,10 +487,11 @@ class NexusDatabaseTest {
           "Alice", "alice@example.com", 25);
 
       // When/Then - Try to insert duplicate email
-      assertThrows(DatabaseException.class, () -> {
-        database.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
-            "Bob", "alice@example.com", 30);
-      });
+      assertThrows(
+          DatabaseException.class,
+          () -> database.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+              "Bob", "alice@example.com", 30)
+      );
     }
 
     @Test
@@ -502,12 +502,13 @@ class NexusDatabaseTest {
           "Alice", "alice@example.com", 25);
 
       // When/Then
-      assertThrows(DatabaseException.class, () -> {
-        database.query("SELECT * FROM users",
-            rs -> {
-              throw new SQLException("Mapper error");
-            });
-      });
+      assertThrows(
+          DatabaseException.class,
+          () -> database.query("SELECT * FROM users",
+              _ -> {
+                throw new SQLException("Mapper error");
+              })
+      );
     }
   }
 
@@ -548,8 +549,8 @@ class NexusDatabaseTest {
               rs.getString("email"), rs.getInt("age"))
       );
       assertEquals(1, users.size());
-      assertEquals("Alice", users.get(0).name());
-      assertEquals(26, users.get(0).age());
+      assertEquals("Alice", users.getFirst().name());
+      assertEquals(26, users.getFirst().age());
     }
 
     @Test

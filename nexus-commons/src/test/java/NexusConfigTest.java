@@ -329,9 +329,8 @@ class NexusConfigTest {
       config.setEnvFilePath(envFile.toString());
       config.init(new String[]{});
 
-      IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-        config.getDatabaseConfig("nonexistent");
-      });
+      IllegalStateException exception = assertThrows(
+          IllegalStateException.class, () -> config.getDatabaseConfig("nonexistent"));
 
       assertTrue(exception.getMessage().contains("No database configuration found"));
     }
@@ -393,9 +392,7 @@ class NexusConfigTest {
       config.setEnvFilePath(envFile.toString());
       config.init(new String[]{});
 
-      assertThrows(IllegalStateException.class, () -> {
-        config.setEnvFilePath("another.env");
-      });
+      assertThrows(IllegalStateException.class, () -> config.setEnvFilePath("another.env"));
     }
 
     @Test

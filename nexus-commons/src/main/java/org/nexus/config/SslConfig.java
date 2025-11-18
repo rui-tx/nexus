@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
 import java.util.Arrays;
 import java.util.List;
 import javax.net.ssl.KeyManagerFactory;
@@ -163,7 +162,7 @@ public final class SslConfig {
     return context;
   }
 
-  private KeyStore loadKeyStore() throws KeyStoreException, IOException, GeneralSecurityException {
+  private KeyStore loadKeyStore() throws IOException, GeneralSecurityException {
     KeyStore keyStore = KeyStore.getInstance("PKCS12");
     try (InputStream keystoreStream = new FileInputStream(keystorePath)) {
       keyStore.load(keystoreStream, keystorePassword.toCharArray());

@@ -241,7 +241,7 @@ class SmokeTests {
 
     assertEquals(200, response.statusCode());
 
-    ApiResponseDTO<Map> apiResponse = MAPPER.readValue(
+    ApiResponseDTO<Map<String, Object>> apiResponse = MAPPER.readValue(
         response.body(),
         MAPPER.getTypeFactory().constructParametricType(
             ApiResponseDTO.class,

@@ -66,7 +66,7 @@ public class EndToEndTestsController {
 
   @Mapping(type = HttpMethod.GET, endpoint = "/query/params")
   public CompletableFuture<Response<Map<String, Object>>> queryParams(
-      @QueryParam(value = "name", required = false, defaultValue = "guest") String name,
+      @QueryParam(value = "name", defaultValue = "guest") String name,
       @QueryParam("age") Integer age) {
 
     return CompletableFuture.supplyAsync(() -> {

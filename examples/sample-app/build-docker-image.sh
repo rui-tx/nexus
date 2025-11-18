@@ -16,8 +16,8 @@ TEMP_CACHE_DIR=".m2_local_cache"
 echo "Preparing local Maven artifacts for Docker build..."
 mkdir -p $TEMP_CACHE_DIR
 
-cp -R $M2_REPO_BASE/org $TEMP_CACHE_DIR/
-cp -R $M2_REPO_BASE/io $TEMP_CACHE_DIR/
+cp -R "$M2_REPO_BASE"/org $TEMP_CACHE_DIR/
+cp -R "$M2_REPO_BASE"/io $TEMP_CACHE_DIR/
 
 
 # Generate Dockerfile

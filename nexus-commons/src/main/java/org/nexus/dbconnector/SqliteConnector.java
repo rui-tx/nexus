@@ -17,7 +17,6 @@ public class SqliteConnector implements DatabaseConnector {
 
   private final HikariDataSource dataSource;
   private final boolean isReady;
-  private final DatabaseConfig config;
 
   /**
    * Create a new SQLite connector.
@@ -36,7 +35,6 @@ public class SqliteConnector implements DatabaseConnector {
    */
   public SqliteConnector(DatabaseConfig config, boolean readOnly) {
     Objects.requireNonNull(config, "Database config cannot be null");
-    this.config = config;
 
     try {
       String databasePath = config.url().replaceFirst("^jdbc:sqlite:", "");
@@ -56,20 +54,7 @@ public class SqliteConnector implements DatabaseConnector {
         }
       }
 
-      HikariConfig hikariConfig = new HikariConfig();
-      String url = config.url() + (readOnly ? "?mode=ro" : "");
-
-      hikariConfig.setJdbcUrl(url);
-      hikariConfig.setMaximumPoolSize(config.poolSize());
-      hikariConfig.setMinimumIdle(1);
-      hikariConfig.setPoolName("sqlite-" + config.name() + (readOnly ? "-ro" : "-rw") + "-pool");
-      hikariConfig.setAutoCommit(config.autoCommit());
-      hikariConfig.setConnectionTimeout(config.connectionTimeout());
-
-      // SQLite-specific optimizations
-      hikariConfig.addDataSourceProperty("journal_mode", "WAL");
-      hikariConfig.addDataSourceProperty("synchronous", "NORMAL");
-      hikariConfig.addDataSourceProperty("busy_timeout", 30000); // 30 seconds
+      HikariConfig hikariConfig = getHikariConfig(config, readOnly);
 
       this.dataSource = new HikariDataSource(hikariConfig);
       this.isReady = true;
@@ -84,6 +69,24 @@ public class SqliteConnector implements DatabaseConnector {
       close();
       throw new DatabaseException("Failed to initialize SQLite connector", e);
     }
+  }
+
+  private static HikariConfig getHikariConfig(DatabaseConfig config, boolean readOnly) {
+    HikariConfig hikariConfig = new HikariConfig();
+    String url = config.url() + (readOnly ? "?mode=ro" : "");
+
+    hikariConfig.setJdbcUrl(url);
+    hikariConfig.setMaximumPoolSize(config.poolSize());
+    hikariConfig.setMinimumIdle(1);
+    hikariConfig.setPoolName("sqlite-" + config.name() + (readOnly ? "-ro" : "-rw") + "-pool");
+    hikariConfig.setAutoCommit(config.autoCommit());
+    hikariConfig.setConnectionTimeout(config.connectionTimeout());
+
+    // SQLite-specific optimizations
+    hikariConfig.addDataSourceProperty("journal_mode", "WAL");
+    hikariConfig.addDataSourceProperty("synchronous", "NORMAL");
+    hikariConfig.addDataSourceProperty("busy_timeout", 30000); // 30 seconds
+    return hikariConfig;
   }
 
   @Override

@@ -55,7 +55,7 @@ public class SmokeTestsController {
   @Mapping(type = HttpMethod.GET, endpoint = "/query/optional")
   public CompletableFuture<Response<Map<String, Object>>> optionalQueryParamTest(
       @QueryParam(value = "required", required = true) String required,
-      @QueryParam(value = "optional", required = false, defaultValue = "default") String optional) {
+      @QueryParam(value = "optional", defaultValue = "default") String optional) {
     return CompletableFuture.completedFuture(
         new Response<>(200, Map.of(
             "required", required,

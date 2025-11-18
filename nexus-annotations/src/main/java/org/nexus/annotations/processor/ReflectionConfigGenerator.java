@@ -175,7 +175,7 @@ final class ReflectionConfigGenerator {
       return;
     }
 
-    messager.printMessage(Kind.NOTE, "Processing type: " + type.toString() +
+    messager.printMessage(Kind.NOTE, "Processing type: " + type +
         " (kind: " + type.getKind() + ")");
 
     if (type.getKind() == TypeKind.ARRAY) {

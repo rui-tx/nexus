@@ -39,10 +39,6 @@ public class TestNexusApplication extends NexusApplication {
     return this.server;
   }
 
-  @Override
-  protected void initializeDatabase() {
-  }
-
   public int getPort() {
     if (server == null) {
       throw new IllegalStateException("Server not started. Call start() first.");
@@ -51,6 +47,7 @@ public class TestNexusApplication extends NexusApplication {
   }
 
   public String getBaseUrl() {
+    //noinspection HttpUrlsUsage
     return "http://" + serverConfig.getBindAddress() + ":" + getPort();
   }
 

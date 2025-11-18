@@ -2,6 +2,7 @@ package org.nexus.annotations.processor;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,8 +22,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
-import javax.tools.JavaFileObject;
 import javax.tools.FileObject;
+import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
@@ -76,7 +77,7 @@ public final class MappingProcessor extends AbstractProcessor {
       return true;
     } catch (Exception e) {
       messager.printMessage(Kind.ERROR, "Failed to generate routes: " + e.getMessage());
-      e.printStackTrace();
+      messager.printMessage(Kind.ERROR, "Trace: " + Arrays.toString(e.getStackTrace()));
       return false;
     }
   }
@@ -200,24 +201,21 @@ public final class MappingProcessor extends AbstractProcessor {
 
     boolean isExact = placeholders.isEmpty();
 
-    StringBuilder sb1 = new StringBuilder();
-    sb1.append("new Route<%s>(%s, \"%s\", rc -> {\n")
-        .append(spacer.repeat(7))
-        .append(paramCode.isEmpty() ? "" : paramCode)
-        .append("%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n")
-        .append(spacer.repeat(7))
-        .append("try {\n")
-        .append(spacer.repeat(8))
-        .append("return controller.%s(%s);\n")
-        .append(spacer.repeat(7))
-        .append("} catch (Exception e) {\n")
-        .append(spacer.repeat(8))
-        .append("return CompletableFuture.failedFuture(e); }})");
-
-    ;
+    String sb1 = "new Route<%s>(%s, \"%s\", rc -> {\n"
+        + spacer.repeat(7)
+        + (paramCode.isEmpty() ? "" : paramCode)
+        + "%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n"
+        + spacer.repeat(7)
+        + "try {\n"
+        + spacer.repeat(8)
+        + "return controller.%s(%s);\n"
+        + spacer.repeat(7)
+        + "} catch (Exception e) {\n"
+        + spacer.repeat(8)
+        + "return CompletableFuture.failedFuture(e); }})";
 
     String routeCreation = String.format(
-        sb1.toString(),
+        sb1,
         responseType, httpMethod, endpoint,
         "", className,  // paramCode (handled above), className
         className, methodName, invokeArgs
@@ -232,17 +230,15 @@ public final class MappingProcessor extends AbstractProcessor {
     } else {
       // Dynamic route: Precompile and add to list
 
-      StringBuilder sb2 = new StringBuilder();
-      sb2.append("dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>())")
-          .append("\n")
-          .append(spacer.repeat(4))
-          .append(".add(new CompiledRoute(CompiledPattern.compile(\"%s\"),")
-          .append("\n")
-          .append(spacer.repeat(6))
-          .append("%s));\n")
-      ;
+      String sb2 = "dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>())"
+          + "\n"
+          + spacer.repeat(4)
+          + ".add(new CompiledRoute(CompiledPattern.compile(\"%s\"),"
+          + "\n"
+          + spacer.repeat(6)
+          + "%s));\n";
 
-      return String.format(sb2.toString(), methodStr, endpoint, routeCreation
+      return String.format(sb2, methodStr, endpoint, routeCreation
       );
     }
   }
@@ -259,7 +255,8 @@ public final class MappingProcessor extends AbstractProcessor {
   }
 
   /**
-   * Writes the ServiceLoader provider configuration so core can load the generated class without reflection.
+   * Writes the ServiceLoader provider configuration so core can load the generated class without
+   * reflection.
    */
   private void writeServiceProvider() throws Exception {
     String servicePath = "META-INF/services/org.nexus.RoutesResolver$RoutesProvider";

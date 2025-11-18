@@ -16,7 +16,6 @@ public class PostgresConnector implements DatabaseConnector {
 
   private final HikariDataSource dataSource;
   private final boolean isReady;
-  private final DatabaseConfig config;
 
   /**
    * Create a new PostgreSQL connector using the provided configuration.
@@ -24,27 +23,10 @@ public class PostgresConnector implements DatabaseConnector {
    * @param config The database configuration
    */
   public PostgresConnector(DatabaseConfig config) {
-    this.config = Objects.requireNonNull(config, "Database config cannot be null");
+    Objects.requireNonNull(config, "Database config cannot be null");
 
     try {
-      HikariConfig hikariConfig = new HikariConfig();
-
-      hikariConfig.setJdbcUrl(config.url());
-      hikariConfig.setUsername(config.username());
-      hikariConfig.setPassword(config.password());
-      hikariConfig.setMaximumPoolSize(config.poolSize());
-      hikariConfig.setMinimumIdle(1);
-      hikariConfig.setPoolName("postgres-" + config.name() + "-pool");
-      hikariConfig.setAutoCommit(config.autoCommit());
-      hikariConfig.setConnectionTimeout(config.connectionTimeout());
-
-      // PostgreSQL-specific optimizations
-      hikariConfig.addDataSourceProperty("tcpKeepAlive", "true");
-      hikariConfig.addDataSourceProperty("loginTimeout", "30");
-
-      // Optional: Enable SSL if your setup requires it
-      // hikariConfig.addDataSourceProperty("ssl", "true");
-      // hikariConfig.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
+      HikariConfig hikariConfig = getHikariConfig(config);
 
       this.dataSource = new HikariDataSource(hikariConfig);
       this.isReady = true;
@@ -59,6 +41,29 @@ public class PostgresConnector implements DatabaseConnector {
       close();
       throw new DatabaseException("Failed to initialize PostgreSQL connector", e);
     }
+  }
+
+  private static HikariConfig getHikariConfig(DatabaseConfig config) {
+    HikariConfig hikariConfig = new HikariConfig();
+
+    hikariConfig.setJdbcUrl(config.url());
+    hikariConfig.setUsername(config.username());
+    hikariConfig.setPassword(config.password());
+    hikariConfig.setMaximumPoolSize(config.poolSize());
+    hikariConfig.setMinimumIdle(1);
+    hikariConfig.setPoolName("postgres-" + config.name() + "-pool");
+    hikariConfig.setAutoCommit(config.autoCommit());
+    hikariConfig.setConnectionTimeout(config.connectionTimeout());
+
+    // PostgreSQL-specific optimizations
+    hikariConfig.addDataSourceProperty("tcpKeepAlive", "true");
+    hikariConfig.addDataSourceProperty("loginTimeout", "30");
+
+    // Optional: Enable SSL
+    // hikariConfig.addDataSourceProperty("ssl", "true");
+    // hikariConfig.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
+    
+    return hikariConfig;
   }
 
   @Override

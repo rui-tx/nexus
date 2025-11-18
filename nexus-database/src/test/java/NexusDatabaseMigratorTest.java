@@ -185,7 +185,7 @@ class NexusDatabaseMigratorTest {
         // Verify migration was recorded
         boolean applied = db.queryOne(
             "SELECT 1 FROM migrations WHERE name = ?",
-            rs -> true,
+            _ -> true,
             "001_create_users.sql"
         ).isPresent();
 
@@ -461,9 +461,7 @@ class NexusDatabaseMigratorTest {
           """);
 
       // When
-      assertThrows(DatabaseException.class, () -> {
-        migrator.migrateAll("testdb");
-      });
+      assertThrows(DatabaseException.class, () -> migrator.migrateAll("testdb"));
 
       // Then - Nothing should be applied due to rollback
       DatabaseConfig config = NexusConfig.getInstance().getDatabaseConfig("testdb");
@@ -524,7 +522,7 @@ class NexusDatabaseMigratorTest {
         // Second migration should not be recorded
         boolean secondApplied = db.queryOne(
             "SELECT 1 FROM migrations WHERE name = ?",
-            rs -> true,
+            _ -> true,
             "002_bad.sql"
         ).isPresent();
         assertFalse(secondApplied);
@@ -564,7 +562,7 @@ class NexusDatabaseMigratorTest {
               DB2_URL=jdbc:sqlite:%s
               DB2_MIGRATIONS_PATH=%s
               """, dbFile.toString(), migrationsDir.toString(),
-          db2File.toString(), migrations2Dir.toString());
+          db2File, migrations2Dir);
 
       Files.writeString(envFile, envContent);
       NexusConfig config = NexusConfig.getInstance();
@@ -632,7 +630,7 @@ class NexusDatabaseMigratorTest {
               DB2_URL=jdbc:sqlite:%s
               DB2_MIGRATIONS_PATH=%s
               """, dbFile.toString(), migrationsDir.toString(),
-          db2File.toString(), migrations2Dir.toString());
+          db2File, migrations2Dir);
 
       Files.writeString(envFile, envContent);
       NexusConfig config = NexusConfig.getInstance();
@@ -693,7 +691,7 @@ class NexusDatabaseMigratorTest {
           DB1_TYPE=SQLITE
           DB1_URL=jdbc:sqlite:%s
           DB1_MIGRATIONS_PATH=%s
-          """, dbFile.toString(), tempDir.resolve("nonexistent").toString());
+          """, dbFile.toString(), tempDir.resolve("nonexistent"));
 
       Files.writeString(envFile, envContent);
       NexusConfig config = NexusConfig.getInstance();
@@ -704,9 +702,7 @@ class NexusDatabaseMigratorTest {
       migrator = new NexusDatabaseMigrator();
 
       // When/Then
-      assertThrows(IllegalStateException.class, () -> {
-        migrator.migrateAll("testdb");
-      });
+      assertThrows(IllegalStateException.class, () -> migrator.migrateAll("testdb"));
     }
 
     @Test
@@ -736,9 +732,9 @@ class NexusDatabaseMigratorTest {
     @DisplayName("Should throw exception when database config not found")
     void testDatabaseConfigNotFound() {
       // When/Then
-      assertThrows(IllegalArgumentException.class, () -> {
-        migrator.migrateAll("nonexistent");
-      });
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> migrator.migrateAll("nonexistent"));
     }
   }
 }

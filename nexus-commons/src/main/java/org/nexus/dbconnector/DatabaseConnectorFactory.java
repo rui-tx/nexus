@@ -50,7 +50,7 @@ public final class DatabaseConnectorFactory {
       throw new IllegalArgumentException("Database configuration cannot be null");
     }
 
-    return connectorCache.computeIfAbsent(config.name(), k -> createNewConnector(config));
+    return connectorCache.computeIfAbsent(config.name(), _ -> createNewConnector(config));
   }
 
   /**
