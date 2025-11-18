@@ -1,6 +1,7 @@
+package org.nexus;
+
 import io.avaje.inject.Bean;
 import io.avaje.inject.Factory;
-import org.nexus.NexusConfig;
 import org.nexus.config.jwt.JwtConfig;
 import org.nexus.config.jwt.JwtService;
 

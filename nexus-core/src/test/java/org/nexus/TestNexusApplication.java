@@ -1,4 +1,5 @@
-import org.nexus.NexusApplication;
+package org.nexus;
+
 import org.nexus.config.ServerConfig;
 import org.nexus.server.NexusServer;
 

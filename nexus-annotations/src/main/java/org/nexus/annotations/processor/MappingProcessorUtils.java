@@ -1,5 +1,7 @@
 package org.nexus.annotations.processor;
 
+import static org.nexus.annotations.processor.MappingProcessorConstants.OBJECT;
+
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -9,7 +11,6 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Types;
 import javax.tools.Diagnostic.Kind;
 
 final class MappingProcessorUtils {
@@ -28,7 +29,7 @@ final class MappingProcessorUtils {
     return names;
   }
 
-  static boolean isListType(TypeMirror tm, Types typeUtils) {
+  static boolean isListType(TypeMirror tm) {
     if (tm.getKind() != TypeKind.DECLARED) {
       return false;
     }
@@ -65,15 +66,15 @@ final class MappingProcessorUtils {
   static String getResponseGenericType(ExecutableElement method) {
     TypeMirror returnType = method.getReturnType();
     if (!(returnType instanceof DeclaredType declaredType)) {
-      return "Object";
+      return OBJECT;
     }
 
     List<? extends TypeMirror> typeArgs = declaredType.getTypeArguments();
     if (typeArgs.isEmpty() || !(typeArgs.getFirst() instanceof DeclaredType responseType)) {
-      return "Object";
+      return OBJECT;
     }
 
     List<? extends TypeMirror> responseArgs = responseType.getTypeArguments();
-    return responseArgs.isEmpty() ? "Object" : responseArgs.getFirst().toString();
+    return responseArgs.isEmpty() ? OBJECT : responseArgs.getFirst().toString();
   }
 }

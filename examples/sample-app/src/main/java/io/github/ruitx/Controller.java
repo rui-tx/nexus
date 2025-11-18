@@ -13,8 +13,6 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class Controller {
 
-  private static final Logger LOGGER = LoggerFactory.getLogger(Controller.class);
-
   private final Service service;
 
   @Inject

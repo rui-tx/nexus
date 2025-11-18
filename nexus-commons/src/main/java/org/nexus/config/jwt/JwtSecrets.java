@@ -35,26 +35,28 @@ public record JwtSecrets(OctetSequenceKey accessTokenSecret, OctetSequenceKey re
     try {
       Base64.getUrlDecoder().decode(value);
       return true;
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException _) {
       return false;
     }
   }
 
   private static OctetSequenceKey createKey(String secret) {
     try {
-      byte[] keyBytes;
-      try {
-        // Try to decode as base64 first
-        keyBytes = Base64.getUrlDecoder().decode(secret);
-      } catch (IllegalArgumentException e) {
-        // If not base64, use the string bytes directly
-        keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-      }
-
+      byte[] keyBytes = getKeyBytes(secret);
       // Create an OctetSequenceKey (symmetric key for HMAC)
       return new OctetSequenceKey.Builder(keyBytes).build();
     } catch (Exception e) {
       throw new IllegalStateException("Failed to create JWT key", e);
+    }
+  }
+
+  private static byte[] getKeyBytes(String secret) {
+    try {
+      // Try to decode as base64 first
+      return Base64.getUrlDecoder().decode(secret);
+    } catch (IllegalArgumentException _) {
+      // If not base64, use the string bytes directly
+      return secret.getBytes(StandardCharsets.UTF_8);
     }
   }
 }

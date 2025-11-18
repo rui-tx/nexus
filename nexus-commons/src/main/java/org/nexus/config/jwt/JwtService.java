@@ -110,7 +110,7 @@ public class JwtService {
       Date expirationTime = claims.getExpirationTime();
       return expirationTime == null || !expirationTime.before(new Date());
 
-    } catch (ParseException | JOSEException e) {
+    } catch (ParseException | JOSEException _) {
       return false;
     }
   }
@@ -135,7 +135,7 @@ public class JwtService {
       }
 
       return signedJWT.getJWTClaimsSet();
-    } catch (ParseException | JOSEException e) {
+    } catch (ParseException | JOSEException _) {
       return null;
     }
   }

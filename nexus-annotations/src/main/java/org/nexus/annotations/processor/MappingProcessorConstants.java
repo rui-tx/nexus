@@ -2,6 +2,10 @@ package org.nexus.annotations.processor;
 
 public final class MappingProcessorConstants {
 
+  public static final String SPACER = "  ";
+  public static final String COMMA_SPACE = "\", \"";
+  public static final String OBJECT = "Object";
+
   public static final String GENERATED_PACKAGE = "org.nexus";
   public static final String GENERATED_FILE_NAME = "GeneratedRoutes";
   public static final String GENERATED_PACKAGE_FILE = GENERATED_PACKAGE + "." + GENERATED_FILE_NAME;
@@ -187,7 +191,7 @@ public final class MappingProcessorConstants {
         public record RouteMatch(Route<?> route, Map<String, String> params) {
       
         }
-
+      
         // Instance wrapper to satisfy RoutesResolver.RoutesProvider without reflection
         @Override
         public RoutesResolver.RouteMatch findMatchingRoute(String method, String path) {

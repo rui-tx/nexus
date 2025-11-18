@@ -12,9 +12,13 @@ import org.nexus.dbconnector.PostgresConnector;
 import org.nexus.dbconnector.SqliteConnector;
 import org.nexus.enums.DatabaseType;
 import org.nexus.interfaces.DatabaseConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Singleton
 public class DatabaseRegistry implements AutoCloseable {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseRegistry.class);
 
   private final Map<String, NexusDatabase> databases;
   private final Map<String, DatabaseConnector> connectors;
@@ -69,7 +73,8 @@ public class DatabaseRegistry implements AutoCloseable {
     for (DatabaseConnector c : connectors.values()) {
       try {
         c.close();
-      } catch (Exception ignored) {
+      } catch (Exception e) {
+        LOGGER.error("Error closing database connector {}: {}", c.toString(), e.getMessage());
       }
     }
   }

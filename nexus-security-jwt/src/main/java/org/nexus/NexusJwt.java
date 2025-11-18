@@ -1,4 +1,5 @@
-import org.nexus.NexusConfig;
+package org.nexus;
+
 import org.nexus.config.jwt.JwtConfig;
 import org.nexus.config.jwt.JwtService;
 
@@ -18,7 +19,7 @@ public final class NexusJwt {
 
   public static void initialize(NexusConfig nexusConfig) {
     if (instance != null) {
-      throw new IllegalStateException("NexusJwt is already initialized");
+      throw new IllegalStateException("org.nexus.NexusJwt is already initialized");
     }
     instance = new NexusJwt(nexusConfig);
   }
@@ -27,7 +28,7 @@ public final class NexusJwt {
     NexusJwt result = instance;
     if (result == null) {
       throw new IllegalStateException(
-          "NexusJwt has not been initialized. Call initialize() first.");
+          "org.nexus.NexusJwt has not been initialized. Call initialize() first.");
     }
     return result;
   }
