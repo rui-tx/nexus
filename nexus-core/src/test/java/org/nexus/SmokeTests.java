@@ -13,65 +13,50 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.nexus.config.ServerConfig;
 import org.nexus.dto.ApiResponseDTO;
 import org.nexus.dto.PathParamResponseTestDTO;
 import org.nexus.dto.test.QueryResponseDTO;
 import org.nexus.dto.test.UserResponseDTO;
-import org.nexus.server.NexusServer;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Nexus Core Smoke Tests")
 class SmokeTests {
 
-  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private static final ObjectMapper MAPPER = NexusUtils.DF_MAPPER;
 
-  private NexusServer server;
-  private HttpClient http;
-  private String baseUrl;
+  private static TestNexusApplication app;
+  private static HttpClient httpClient;
+  private static String baseUrl;
 
   @BeforeAll
-  static void init() {
-    // Initialize DI scope
-    NexusBeanScope.init();
+  static void setUp() {
+    System.setProperty("nexus.test", "true");
+    app = TestNexusApplication.getInstance();
+    app.start(new String[]{});
+    httpClient = NexusHttpClient.get();
+    baseUrl = app.getBaseUrl();
   }
 
-  @BeforeEach
-  void setUp() throws Exception {
-
-    ServerConfig cfg = ServerConfig.builder()
-        .bindAddress("127.0.0.1")
-        .port(0)
-        .idleTimeoutSeconds(300)
-        .maxContentLength(1_048_576)
-        .build();
-
-    server = new NexusServer(cfg, List.of());
-    server.start();
-    baseUrl = "http://127.0.0.1:" + server.getPort();
-    http = HttpClient.newHttpClient();
-  }
-
-  @AfterEach
-  void tearDown() {
-    server.stop();
+  @AfterAll
+  static void tearDown() {
+    if (app != null) {
+      app.stop();
+    }
   }
 
   @Test
   @Order(1)
   @DisplayName("Should return 200 for a existing endpoint")
   void found_returns200() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/found")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(200, res.statusCode());
@@ -82,7 +67,7 @@ class SmokeTests {
   @Order(2)
   @DisplayName("Should return 404 for a non-existing endpoint")
   void notFound_returns404() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/not-found")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(404, res.statusCode());
@@ -92,7 +77,7 @@ class SmokeTests {
   @Order(3)
   @DisplayName("Should return 500 for an unexcepted error")
   void unexpectedException_returns500() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/throw")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(500, res.statusCode());
@@ -105,7 +90,7 @@ class SmokeTests {
     String name = "testUser";
     String encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8);
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/query/single?name=" + encodedName))
             .GET()
             .build(),
@@ -134,7 +119,7 @@ class SmokeTests {
     int pathParam1 = 1;
     String pathParam2 = "john";
 
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(
                 URI.create(baseUrl + "/path/%d/%s".formatted(pathParam1, pathParam2)))
             .GET()
@@ -167,7 +152,7 @@ class SmokeTests {
         age,
         active);
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(url))
             .GET()
             .build(),
@@ -197,7 +182,7 @@ class SmokeTests {
   void queryParam_optionalParams_returns200() throws Exception {
     String required = "requiredValue";
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(
                 URI.create(baseUrl + "/query/optional?required=" + URLEncoder.encode(required,
                     StandardCharsets.UTF_8)))
@@ -233,7 +218,7 @@ class SmokeTests {
 
     String requestBodyStr = MAPPER.writeValueAsString(requestBody);
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/body/json"))
             .POST(HttpRequest.BodyPublishers.ofString(requestBodyStr))
             .header("Content-Type", "application/json")
@@ -265,7 +250,7 @@ class SmokeTests {
     String requestText = "This is a raw text request body";
     String requestBody = "\"" + requestText + "\"";
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/body/echo"))
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .header("Content-Type", "application/json")
@@ -298,7 +283,7 @@ class SmokeTests {
 
     String requestBodyStr = MAPPER.writeValueAsString(requestBody);
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/body/validate"))
             .POST(HttpRequest.BodyPublishers.ofString(requestBodyStr))
             .header("Content-Type", "application/json")
@@ -331,7 +316,7 @@ class SmokeTests {
 
     String requestBodyStr = MAPPER.writeValueAsString(requestBody);
 
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/body/validate"))
             .POST(HttpRequest.BodyPublishers.ofString(requestBodyStr))
             .header("Content-Type", "application/json")
@@ -360,7 +345,7 @@ class SmokeTests {
   @DisplayName("Should return 400 when sending empty body")
   void validateBody_emptyBody_returns400() throws Exception {
     // Send a request with an empty body
-    HttpResponse<String> response = http.send(
+    HttpResponse<String> response = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/body/validate"))
             .POST(HttpRequest.BodyPublishers.noBody())
             .header("Content-Type", "application/json")
@@ -392,7 +377,7 @@ class SmokeTests {
               errorMessage.contains("No content to map"),
           "Unexpected error message: " + errorMessage
       );
-    } catch (Exception e) {
+    } catch (Exception _) {
       // If parsing as JSON fails, check if the response body contains the expected error message
       assertTrue(
           response.body().contains("Request body cannot be empty") ||

@@ -27,11 +27,11 @@ class EndToEndTests {
 
   @BeforeAll
   static void setUp() {
+    System.setProperty("nexus.test", "true");
     app = TestNexusApplication.getInstance();
     app.start(new String[]{});
-    httpClient = NexusHttpClient.INSTANCE.get();
+    httpClient = NexusHttpClient.get();
     baseUrl = app.getBaseUrl();
-    NexusBeanScope.init();
   }
 
   @AfterAll

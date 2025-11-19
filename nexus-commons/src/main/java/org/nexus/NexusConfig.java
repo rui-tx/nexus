@@ -80,7 +80,8 @@ public final class NexusConfig {
         String[] parts = arg.substring(2).split("=", 2);
         if (parts.length == 2) {
           config.put(parts[0], parts[1]);
-          LOGGER.debug("Set config from CLI: {}={}", parts[0], "*".repeat(parts[1].length()));
+          String obfuscated = "*".repeat(parts[1].length());
+          LOGGER.debug("Set config from CLI: {}={}", parts[0], obfuscated);
         } else {
           config.put(parts[0], "true");
           LOGGER.debug("Set flag from CLI: {}", parts[0]);

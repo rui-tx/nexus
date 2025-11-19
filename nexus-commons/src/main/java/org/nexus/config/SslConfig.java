@@ -155,7 +155,8 @@ public final class SslConfig {
     SslContext context = builder.build();
 
     LOGGER.debug("SSL context initialized successfully");
-    LOGGER.debug("  Protocols: {}", Arrays.toString(SECURE_PROTOCOLS));
+    String protocols = Arrays.toString(SECURE_PROTOCOLS);
+    LOGGER.debug("  Protocols: {}", protocols);
     LOGGER.debug("  Cipher suites: {} configured", SECURE_CIPHERS.size());
     LOGGER.debug("  Client auth: {}", requireClientAuth ? "REQUIRED" : "OPTIONAL");
 

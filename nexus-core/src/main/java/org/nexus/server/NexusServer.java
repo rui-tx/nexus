@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import org.nexus.NexusBeanScope;
+import org.nexus.NexusExecutor;
 import org.nexus.config.ServerConfig;
 import org.nexus.handlers.DefaultHttpServerHandler;
 import org.nexus.interfaces.Middleware;
@@ -44,7 +45,6 @@ public class NexusServer {
     this.config = config;
     List<Middleware> defaults = new ArrayList<>();
     defaults.add(new LoggingMiddleware());
-//    defaults.add(new SecurityMiddleware());
     this.middlewares = List.copyOf(defaults);
     verifyRoutesAvailability();
   }
@@ -57,7 +57,7 @@ public class NexusServer {
    */
   public NexusServer(ServerConfig config, List<Middleware> middlewares) {
     this.config = config;
-    // Use exactly the provided list, caller decides whether to include defaults.
+    // Use exactly the provided list; Caller decides whether to include defaults.
     this.middlewares = List.copyOf(middlewares);
     verifyRoutesAvailability();
   }
@@ -132,9 +132,9 @@ public class NexusServer {
     ChannelPipeline p = ch.pipeline();
 
     // Add SSL first if enabled
-//    if (config.isSslEnabled() && config.getSslConfig() != null) {
-//      p.addLast(config.getSslConfig().createSslHandler(ch.alloc()));
-//    }
+    /*if (config.isSslEnabled() && config.getSslConfig() != null) {
+      p.addLast(config.getSslConfig().createSslHandler(ch.alloc()));
+    }*/
 
     // Add HTTP codec
     p.addLast(new HttpServerCodec());
@@ -193,13 +193,18 @@ public class NexusServer {
       }
     }
 
+    // dont close executor on tests
+    if (!"true".equals(System.getProperty("nexus.test"))) {
+      NexusExecutor.shutdown();
+    }
+
     LOGGER.info("Server shutdown complete");
   }
 
   private void verifyRoutesAvailability() {
     try {
       Class.forName("org.nexus.GeneratedRoutes");
-    } catch (ClassNotFoundException e) {
+    } catch (ClassNotFoundException _) {
       LOGGER.warn("No routes found. Did you annotate your controller methods with @Mapping?");
     }
   }

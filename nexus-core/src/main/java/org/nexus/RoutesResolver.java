@@ -12,37 +12,27 @@ import java.util.ServiceLoader;
  */
 public final class RoutesResolver {
 
-  private static volatile RoutesProvider provider;
-
   private RoutesResolver() {
   }
 
-  private static RoutesProvider load() {
-    RoutesProvider p = provider;
-    if (p != null) {
-      return p;
-    }
-    synchronized (RoutesResolver.class) {
-      if (provider != null) {
-        return provider;
-      }
-      ServiceLoader<RoutesProvider> loader = ServiceLoader.load(RoutesProvider.class);
-      for (RoutesProvider rp : loader) {
-        provider = rp;
-        break;
-      }
-      return provider;
-    }
-  }
-
   public static RouteMatch findMatchingRoute(String method, String path) {
-    RoutesProvider p = load();
-    return (p == null) ? null : p.findMatchingRoute(method, path);
+    RoutesProvider p = ProviderHolder.INSTANCE;
+    return p != null ? p.findMatchingRoute(method, path) : null;
   }
 
   public interface RoutesProvider {
 
     RouteMatch findMatchingRoute(String method, String path);
+  }
+
+  private static class ProviderHolder {
+
+    static final RoutesProvider INSTANCE = loadProvider();
+
+    private static RoutesProvider loadProvider() {
+      ServiceLoader<RoutesProvider> loader = ServiceLoader.load(RoutesProvider.class);
+      return loader.findFirst().orElse(null);
+    }
   }
 
   public record RouteMatch(Route<?> route, Map<String, String> params) {

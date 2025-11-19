@@ -10,7 +10,6 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.nexus.config.db.DatabaseConfig;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
@@ -29,9 +28,6 @@ public class NexusDatabaseMigrator {
         applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
       """.formatted(MIGRATION_TABLE);
-
-  public NexusDatabaseMigrator() {
-  }
 
   /**
    * Migrate all configured databases or a specific one.
@@ -99,7 +95,7 @@ public class NexusDatabaseMigrator {
       try (var stmt = conn.createStatement()) {
         stmt.executeQuery("SELECT COUNT(*) FROM " + MIGRATION_TABLE); // Test query
         return null;
-      } catch (SQLException e) {
+      } catch (SQLException _) {
         // Table doesn't exist, create it
         db.update(CREATE_MIGRATION_TABLE_SQL);
         LOGGER.info("Created migration table: {}", MIGRATION_TABLE);
@@ -117,7 +113,7 @@ public class NexusDatabaseMigrator {
       files = stream
           .filter(p -> p.toString().endsWith(".sql"))
           .sorted() // Sort alphabetically (assume numbered prefixes)
-          .collect(Collectors.toList());
+          .toList();
     }
 
     if (files.isEmpty()) {

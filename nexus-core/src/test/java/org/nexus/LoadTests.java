@@ -11,47 +11,34 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
-import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.nexus.config.ServerConfig;
-import org.nexus.server.NexusServer;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LoadTests {
 
-  private NexusServer server;
-  private HttpClient http;
-  private String baseUrl;
+  private static TestNexusApplication app;
+  private static HttpClient http;
+  private static String baseUrl;
 
   @BeforeAll
-  static void init() {
-    // Initialize DI scope
-    NexusBeanScope.init();
+  static void setUp() {
+    System.setProperty("nexus.test", "true");
+    app = TestNexusApplication.getInstance();
+    app.start(new String[]{});
+    http = NexusHttpClient.get();
+    baseUrl = app.getBaseUrl();
   }
 
-  @BeforeEach
-  void setUp() throws Exception {
-    ServerConfig cfg = ServerConfig.builder()
-        .bindAddress("127.0.0.1")
-        .port(0)
-        .idleTimeoutSeconds(300)
-        .maxContentLength(1_048_576)
-        .build();
-
-    server = new NexusServer(cfg, List.of());
-    server.start();
-    baseUrl = "http://127.0.0.1:" + server.getPort();
-    http = HttpClient.newHttpClient();
-  }
-
-  @AfterEach
-  void tearDown() {
-    server.stop();
+  @AfterAll
+  static void tearDown() {
+    if (app != null) {
+      app.stop();
+    }
   }
 
   @Test
@@ -156,7 +143,7 @@ class LoadTests {
               } catch (Exception e) {
                 throw new RuntimeException("Request failed for URL: " + url, e);
               }
-            }, NexusExecutor.INSTANCE.get())
+            }, NexusExecutor.get())
         )
         .toList();
 

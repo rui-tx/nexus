@@ -2,32 +2,33 @@ package org.nexus;
 
 import java.util.ServiceLoader;
 
+/**
+ * Resolves the SecurityRulesProvider at runtime via ServiceLoader. No compile-time dependency on
+ * the generated provider.
+ */
 public final class SecurityResolver {
 
-  private static volatile SecurityRulesProvider provider;
-
-  private SecurityResolver() {}
-
-  private static SecurityRulesProvider load() {
-    SecurityRulesProvider p = provider;
-    if (p != null) return p;
-    synchronized (SecurityResolver.class) {
-      if (provider != null) return provider;
-      ServiceLoader<SecurityRulesProvider> loader = ServiceLoader.load(SecurityRulesProvider.class);
-      for (SecurityRulesProvider rp : loader) {
-        provider = rp;
-        break;
-      }
-      return provider;
-    }
+  private SecurityResolver() {
   }
 
   public static SecurityRule getRule(String method, String path) {
-    SecurityRulesProvider p = load();
-    return (p == null) ? null : p.getRule(method, path);
+    SecurityRulesProvider provider = ProviderHolder.INSTANCE;
+    return provider != null ? provider.getRule(method, path) : null;
   }
 
   public interface SecurityRulesProvider {
+
     SecurityRule getRule(String method, String path);
+  }
+
+  private static final class ProviderHolder {
+
+    static final SecurityRulesProvider INSTANCE = loadProvider();
+
+    private static SecurityRulesProvider loadProvider() {
+      return ServiceLoader.load(SecurityRulesProvider.class)
+          .findFirst()
+          .orElse(null);
+    }
   }
 }

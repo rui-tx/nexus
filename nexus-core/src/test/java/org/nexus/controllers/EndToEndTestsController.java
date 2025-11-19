@@ -22,14 +22,14 @@ public class EndToEndTestsController {
       response.put("status", "UP");
       response.put("service", "test-service");
       return new Response<>(200, response);
-    }, NexusExecutor.INSTANCE.get());
+    }, NexusExecutor.get());
   }
 
   @Mapping(type = HttpMethod.POST, endpoint = "/echo")
   public CompletableFuture<Response<String>> echo(@RequestBody String body) {
     return CompletableFuture.supplyAsync(
         () -> new Response<>(200, body),
-        NexusExecutor.INSTANCE.get()
+        NexusExecutor.get()
     );
   }
 
@@ -42,7 +42,7 @@ public class EndToEndTestsController {
       response.put("id", id);
       response.put("name", name);
       return new Response<>(200, response);
-    }, NexusExecutor.INSTANCE.get());
+    }, NexusExecutor.get());
   }
 
   @Mapping(type = HttpMethod.POST, endpoint = "/users/register")
@@ -61,7 +61,7 @@ public class EndToEndTestsController {
       user.setPassword("[PROTECTED]");
 
       return new Response<>(200, user);
-    }, NexusExecutor.INSTANCE.get());
+    }, NexusExecutor.get());
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = "/query/params")
@@ -76,7 +76,7 @@ public class EndToEndTestsController {
         response.put("age", age);
       }
       return new Response<>(200, response);
-    }, NexusExecutor.INSTANCE.get());
+    }, NexusExecutor.get());
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = "/error/simulate")
@@ -85,7 +85,7 @@ public class EndToEndTestsController {
         () -> {
           throw new RuntimeException("This is a simulated error for testing purposes");
         },
-        NexusExecutor.INSTANCE.get()
+        NexusExecutor.get()
     );
   }
 
@@ -97,6 +97,6 @@ public class EndToEndTestsController {
         throw new IllegalArgumentException("Request body cannot be empty");
       }
       return new Response<>(200, body);
-    }, NexusExecutor.INSTANCE.get());
+    }, NexusExecutor.get());
   }
 }

@@ -60,9 +60,11 @@ public class PostgresConnector implements DatabaseConnector {
     hikariConfig.addDataSourceProperty("loginTimeout", "30");
 
     // Optional: Enable SSL
-    // hikariConfig.addDataSourceProperty("ssl", "true");
-    // hikariConfig.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
-    
+    /*
+     hikariConfig.addDataSourceProperty("ssl", "true");
+     hikariConfig.addDataSourceProperty("sslfactory", "org.postgresql.ssl.NonValidatingFactory");
+    */
+
     return hikariConfig;
   }
 

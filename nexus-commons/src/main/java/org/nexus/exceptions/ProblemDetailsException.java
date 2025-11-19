@@ -4,7 +4,7 @@ import org.nexus.interfaces.ProblemDetails;
 
 public class ProblemDetailsException extends RuntimeException {
 
-  private final ProblemDetails problemDetails;
+  private final transient ProblemDetails problemDetails;
 
   public ProblemDetailsException(ProblemDetails problemDetails) {
     super(problemDetails instanceof ProblemDetails.Single single

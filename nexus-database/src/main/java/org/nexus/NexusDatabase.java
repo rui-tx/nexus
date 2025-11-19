@@ -11,12 +11,16 @@ import java.util.Objects;
 import java.util.Optional;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Database is a simple, lightweight database access layer. It provides a clean API for executing
  * queries and managing transactions.
  */
 public class NexusDatabase implements AutoCloseable {
+
+  private static final Logger LOGGER = LoggerFactory.getLogger(NexusDatabase.class);
 
   private final DatabaseConnector connector;
   private final ThreadLocal<Connection> transactionConnection = new ThreadLocal<>();
@@ -198,7 +202,7 @@ public class NexusDatabase implements AutoCloseable {
         try {
           conn.close();
         } catch (SQLException e) {
-          // Log or handle close exception
+          LOGGER.error("Failed to close database connection", e);
         }
       }
     }
@@ -226,7 +230,7 @@ public class NexusDatabase implements AutoCloseable {
         conn.rollback();
         cleanupTransaction(conn);
       } catch (SQLException e) {
-        // Log or handle close exception
+        LOGGER.error("Failed to close database connection", e);
       }
     }
   }

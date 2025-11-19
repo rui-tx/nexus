@@ -43,11 +43,10 @@ public class SqliteConnector implements DatabaseConnector {
       if (!readOnly && !dbFile.exists()) {
         // Create parent directories if they don't exist
         File parent = dbFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-          if (!parent.mkdirs()) {
-            throw new IllegalStateException("Failed to create database directory: " + parent);
-          }
+        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+          throw new IllegalStateException("Failed to create database directory: " + parent);
         }
+
         // Create the database file
         if (!dbFile.createNewFile()) {
           throw new IllegalStateException("Failed to create database file: " + databasePath);

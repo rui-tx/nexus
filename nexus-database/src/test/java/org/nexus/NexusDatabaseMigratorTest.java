@@ -1,3 +1,5 @@
+package org.nexus;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -6,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -14,12 +17,11 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
-import org.nexus.NexusConfig;
-import org.nexus.NexusDatabase;
-import org.nexus.NexusDatabaseMigrator;
 import org.nexus.config.db.DatabaseConfig;
+import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.dbconnector.SqliteConnector;
 import org.nexus.exceptions.DatabaseException;
+import org.nexus.interfaces.DatabaseConnector;
 
 @DisplayName("NexusDatabaseMigrator Integration Tests")
 @Execution(ExecutionMode.SAME_THREAD)
@@ -503,7 +505,7 @@ class NexusDatabaseMigratorTest {
       // When - Apply migrations, second one will fail
       try {
         migrator.migrateAll("testdb");
-      } catch (DatabaseException e) {
+      } catch (DatabaseException _) {
         // Expected
       }
 
@@ -551,7 +553,6 @@ class NexusDatabaseMigratorTest {
       Files.createDirectories(migrations2Dir);
 
       // Recreate config with two databases
-      //resetNexusConfig();
       String envContent = String.format("""
               DB1_NAME=testdb1
               DB1_TYPE=SQLITE
@@ -619,7 +620,6 @@ class NexusDatabaseMigratorTest {
       Files.createDirectories(migrations2Dir);
 
       // Recreate config with two databases
-      //resetNexusConfig();
       String envContent = String.format("""
               DB1_NAME=testdb1
               DB1_TYPE=SQLITE
@@ -685,7 +685,6 @@ class NexusDatabaseMigratorTest {
     @DisplayName("Should throw exception when migrations directory does not exist")
     void testMigrationsDirectoryNotFound() throws IOException {
       // Given
-      //resetNexusConfig();
       String envContent = String.format("""
           DB1_NAME=testdb
           DB1_TYPE=SQLITE
@@ -709,7 +708,6 @@ class NexusDatabaseMigratorTest {
     @DisplayName("Should skip database when no migrations path configured")
     void testNoMigrationsPathConfigured() throws IOException {
       // Given
-      //resetNexusConfig();
       String envContent = String.format("""
           DB1_NAME=testdb
           DB1_TYPE=SQLITE
@@ -721,11 +719,27 @@ class NexusDatabaseMigratorTest {
       config.setEnvFilePath(envFile.toString());
       config.init(new String[]{});
 
-      // Recreate migrator with new config
       migrator = new NexusDatabaseMigrator();
 
-      // When/Then - Should not throw, just skip
+      // When
       migrator.migrateAll("testdb");
+
+      // Then - Verify migration table was NOT created (since migrations were skipped)
+      try (DatabaseConnector connector = DatabaseConnectorFactory.createNonCached(
+          config.getAllDatabaseConfigs().get("testdb"))) {
+        NexusDatabase db = new NexusDatabase(connector);
+
+        boolean tableExists = db.withConnection(conn -> {
+          try (var stmt = conn.createStatement()) {
+            stmt.executeQuery("SELECT COUNT(*) FROM migrations");
+            return true;
+          } catch (SQLException e) {
+            return false;
+          }
+        });
+
+        assertFalse(tableExists, "Migration table should not exist when migrations are skipped");
+      }
     }
 
     @Test

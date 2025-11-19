@@ -40,7 +40,7 @@ public class LoadTestsController {
 
   @Mapping(type = HttpMethod.GET, endpoint = "/primes/:number")
   public CompletableFuture<Response<String>> primes(int number) {
-    return CompletableFuture.supplyAsync(() -> countPrimes(number), NexusExecutor.INSTANCE.get())
+    return CompletableFuture.supplyAsync(() -> countPrimes(number), NexusExecutor.get())
         .thenApply(count -> new Response<>(200, "Found %s primes".formatted(count)));
   }
 }
