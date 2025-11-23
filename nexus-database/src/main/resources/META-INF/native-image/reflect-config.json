@@ -1,0 +1,22 @@
+[
+  {
+    "name": "com.zaxxer.hikari.HikariConfig",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true,
+    "allDeclaredFields": true
+  },
+  {
+    "name": "com.zaxxer.hikari.HikariDataSource",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "org.sqlite.JDBC",
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.sqlite.jdbc4.JDBC4Connection",
+    "allDeclaredConstructors": true,
+    "allDeclaredMethods": true
+  }
+]

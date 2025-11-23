@@ -19,7 +19,12 @@ public final class NexusBeanScope {
       return;
     }
 
+    LOGGER.info("Initializing BeanScope...");
     scope = BeanScope.builder().build();
+
+    for (var b : scope.all()) {
+      LOGGER.debug("  - Beans: {}", b);
+    }
   }
 
   public static synchronized BeanScope get() {
