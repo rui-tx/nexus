@@ -22,7 +22,12 @@ Netty-based web server
 # Sonar
 
 ```
-mvn clean verify sonar:sonar -Dsonar.projectKey=nexus -Dsonar.projectName=nexus -Dsonar.token=sqp_...
+mvn clean verify sonar:sonar \         
+  -Dsonar.projectKey=nexus \
+  -Dsonar.projectName='nexus' \
+  -Dsonar.host.url=http://localhost:9000 \
+  -Dsonar.token=sqp```
+
 ```
 
 ```
