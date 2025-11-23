@@ -1,10 +1,13 @@
 package org.nexus.controllers;
 
+import io.netty.handler.codec.http.FullHttpResponse;
 import jakarta.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import org.nexus.CachedHttpResponse;
 import org.nexus.NexusExecutor;
+import org.nexus.NexusStaticResponseRegistry;
 import org.nexus.Response;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.QueryParam;
@@ -14,6 +17,10 @@ import org.nexus.enums.HttpMethod;
 
 @Singleton
 public class EndToEndTestsController {
+
+  static {
+    NexusStaticResponseRegistry.register("cache", "OK", 200);
+  }
 
   @Mapping(type = HttpMethod.GET, endpoint = "/health")
   public CompletableFuture<Response<Map<String, Object>>> healthCheck() {
@@ -98,5 +105,12 @@ public class EndToEndTestsController {
       }
       return new Response<>(200, body);
     }, NexusExecutor.get());
+  }
+
+  @Mapping(type = HttpMethod.GET, endpoint = "/cache")
+  public CompletableFuture<Response<String>> echo() {
+    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("cache");
+    return CompletableFuture.supplyAsync(() -> new CachedHttpResponse<>(preComputed),
+        NexusExecutor.get());
   }
 }

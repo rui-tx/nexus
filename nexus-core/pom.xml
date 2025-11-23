@@ -12,6 +12,7 @@
 
   <artifactId>nexus-core</artifactId>
   <packaging>jar</packaging>
+  <name>Nexus Core</name>
 
   <dependencyManagement>
     <dependencies>

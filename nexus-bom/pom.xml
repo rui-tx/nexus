@@ -8,6 +8,7 @@
   <artifactId>nexus-bom</artifactId>
   <version>0.1-ALPHA-SNAPSHOT</version>
   <packaging>pom</packaging>
+  <name>Nexus Bill of Materials</name>
 
   <properties>
     <revision>0.1-ALPHA-SNAPSHOT</revision>

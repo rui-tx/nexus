@@ -12,6 +12,7 @@
 
   <artifactId>nexus-commons</artifactId>
   <packaging>jar</packaging>
+  <name>Nexus Commons</name>
 
   <dependencyManagement>
     <dependencies>

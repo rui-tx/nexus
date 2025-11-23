@@ -12,6 +12,7 @@
 
   <artifactId>nexus-annotations</artifactId>
   <packaging>jar</packaging>
+  <name>Nexus Annotations</name>
 
   <dependencyManagement>
     <dependencies>

@@ -12,6 +12,7 @@
 
   <artifactId>nexus-database</artifactId>
   <packaging>jar</packaging>
+  <name>Nexus Database</name>
 
   <dependencyManagement>
       <dependencies>

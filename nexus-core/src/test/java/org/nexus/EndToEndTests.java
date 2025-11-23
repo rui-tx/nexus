@@ -132,4 +132,18 @@ class EndToEndTests {
 //    assertTrue(responseBody.contains("error") || responseBody.contains("message"),
 //        "Response should contain error information");
   }
+
+  @Test
+  @Order(5)
+  void testCachedResponse() throws Exception {
+    HttpResponse<String> response = httpClient.send(
+        HttpRequest.newBuilder(URI.create(baseUrl + "/cache"))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString()
+    );
+
+    assertEquals(200, response.statusCode());
+    assertTrue(response.body().contains("status"), "Response should contain status field");
+  }
 }
