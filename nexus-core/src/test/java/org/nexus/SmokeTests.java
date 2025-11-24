@@ -6,12 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -37,10 +40,42 @@ class SmokeTests {
   private static String baseUrl;
 
   @BeforeAll
-  static void setUp() {
+  static void setUp() throws IOException {
+    NexusConfig.closeInstance();
+
+    // Create temp directory for the test database
+    Path tempDir = Files.createTempDirectory("nexus-e2e-test-");
+    Path dbFile = tempDir.resolve("test.db");
+    Path migrationsDir = tempDir.resolve("migrations");
+
+    Files.createDirectories(migrationsDir);
+
+    // Create a test.env file
+    Path envFile = tempDir.resolve(".env");
+    String envContent = String.format("""
+        DB1_NAME=test-db
+        DB1_TYPE=SQLITE
+        DB1_URL=jdbc:sqlite:%s
+        DB1_POOL_SIZE=5
+        DB1_AUTO_COMMIT=true
+        DB1_CONNECTION_TIMEOUT=10000
+        DB1_MIGRATIONS_PATH=%s
+        
+        # Server config
+        BIND_ADDRESS=0.0.0.0
+        SERVER_PORT=0
+        """, dbFile, migrationsDir.toAbsolutePath());
+
+    Files.writeString(envFile, envContent);
+
+    NexusConfig config = NexusConfig.getInstance();
+    config.setEnvFilePath(envFile.toString());
+    config.init(new String[]{});
+
     System.setProperty("nexus.test", "true");
     app = TestNexusApplication.getInstance();
     app.start(new String[]{});
+
     httpClient = NexusHttpClient.get();
     baseUrl = app.getBaseUrl();
   }
@@ -50,6 +85,8 @@ class SmokeTests {
     if (app != null) {
       app.stop();
     }
+
+    NexusConfig.closeInstance();
   }
 
   @Test

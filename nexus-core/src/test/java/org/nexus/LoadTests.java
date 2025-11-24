@@ -3,10 +3,13 @@ package org.nexus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -22,15 +25,47 @@ import org.junit.jupiter.api.TestMethodOrder;
 class LoadTests {
 
   private static TestNexusApplication app;
-  private static HttpClient http;
+  private static HttpClient httpClient;
   private static String baseUrl;
 
   @BeforeAll
-  static void setUp() {
+  static void setUp() throws IOException {
+    NexusConfig.closeInstance();
+
+    // Create temp directory for the test database
+    Path tempDir = Files.createTempDirectory("nexus-e2e-test-");
+    Path dbFile = tempDir.resolve("test.db");
+    Path migrationsDir = tempDir.resolve("migrations");
+
+    Files.createDirectories(migrationsDir);
+
+    // Create a test.env file
+    Path envFile = tempDir.resolve(".env");
+    String envContent = String.format("""
+        DB1_NAME=test-db
+        DB1_TYPE=SQLITE
+        DB1_URL=jdbc:sqlite:%s
+        DB1_POOL_SIZE=5
+        DB1_AUTO_COMMIT=true
+        DB1_CONNECTION_TIMEOUT=10000
+        DB1_MIGRATIONS_PATH=%s
+        
+        # Server config
+        BIND_ADDRESS=0.0.0.0
+        SERVER_PORT=0
+        """, dbFile, migrationsDir.toAbsolutePath());
+
+    Files.writeString(envFile, envContent);
+
+    NexusConfig config = NexusConfig.getInstance();
+    config.setEnvFilePath(envFile.toString());
+    config.init(new String[]{});
+
     System.setProperty("nexus.test", "true");
     app = TestNexusApplication.getInstance();
     app.start(new String[]{});
-    http = NexusHttpClient.get();
+
+    httpClient = NexusHttpClient.get();
     baseUrl = app.getBaseUrl();
   }
 
@@ -39,12 +74,13 @@ class LoadTests {
     if (app != null) {
       app.stop();
     }
+    NexusConfig.closeInstance();
   }
 
   @Test
   @Order(1)
   void single_lightLoad_returns200() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/primes/100000")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(200, res.statusCode());
@@ -55,7 +91,7 @@ class LoadTests {
   @Test
   @Order(2)
   void single_mediumLoad_returns200() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/primes/1000000")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(200, res.statusCode());
@@ -66,7 +102,7 @@ class LoadTests {
   @Test
   @Order(3)
   void single_heavyLoad_returns200() throws Exception {
-    HttpResponse<String> res = http.send(
+    HttpResponse<String> res = httpClient.send(
         HttpRequest.newBuilder(URI.create(baseUrl + "/primes/5000000")).GET().build(),
         HttpResponse.BodyHandlers.ofString());
     assertEquals(200, res.statusCode());
@@ -134,7 +170,7 @@ class LoadTests {
         .mapToObj(i ->
             CompletableFuture.supplyAsync(() -> {
               try {
-                return http.send(
+                return httpClient.send(
                     HttpRequest.newBuilder(URI.create(url))
                         .GET()
                         .build(),

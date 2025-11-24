@@ -1,11 +1,14 @@
 package org.nexus.controllers;
 
 import io.netty.handler.codec.http.FullHttpResponse;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.nexus.CachedHttpResponse;
+import org.nexus.NexusDatabase;
 import org.nexus.NexusExecutor;
 import org.nexus.NexusStaticResponseRegistry;
 import org.nexus.Response;
@@ -20,6 +23,13 @@ public class EndToEndTestsController {
 
   static {
     NexusStaticResponseRegistry.register("cache", "OK", 200);
+  }
+
+  private final NexusDatabase db1;
+
+  @Inject
+  public EndToEndTestsController(NexusDatabase db1) {
+    this.db1 = db1;
   }
 
   @Mapping(type = HttpMethod.GET, endpoint = "/health")
@@ -112,5 +122,44 @@ public class EndToEndTestsController {
     FullHttpResponse preComputed = NexusStaticResponseRegistry.get("cache");
     return CompletableFuture.supplyAsync(() -> new CachedHttpResponse<>(preComputed),
         NexusExecutor.get());
+  }
+
+  @Mapping(type = HttpMethod.GET, endpoint = "/db-integration")
+  public CompletableFuture<Response<List<User>>> dbIntegration() {
+    return CompletableFuture.supplyAsync(() -> {
+
+      db1.update("""
+          CREATE TABLE users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            age INTEGER,
+            active INTEGER DEFAULT 1
+          )
+          """);
+
+      db1.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+          "Alice", "alice@example.com", 25);
+      db1.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+          "Bob", "bob@example.com", 30);
+      db1.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
+          "Charlie", "charlie@example.com", 35);
+
+      List<User> users = db1.query(
+          "SELECT id, name, email, age FROM users ORDER BY age",
+          rs -> new User(
+              rs.getInt("id"),
+              rs.getString("name"),
+              rs.getString("email"),
+              rs.getInt("age")
+          )
+      );
+
+      return new Response<>(200, users);
+    }, NexusExecutor.get());
+  }
+
+  public record User(int id, String name, String email, int age) {
+
   }
 }
