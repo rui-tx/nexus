@@ -12,97 +12,105 @@
     <name>Nexus</name>
 
     <modules>
-        <module>nexus-bom</module>
-        <module>nexus-commons</module>
-        <module>nexus-annotations</module>
-        <module>nexus-core</module>
-        <module>nexus-security-jwt</module>
-        <module>nexus-database</module>
-        <module>nexus-starter</module>
-        <module>nexus-coverage-report</module>
+      <module>nexus-bom</module>
+      <module>nexus-commons</module>
+      <module>nexus-annotations</module>
+      <module>nexus-core</module>
+      <module>nexus-security-jwt</module>
+      <module>nexus-database</module>
+      <module>nexus-starter</module>
+      <module>nexus-coverage-report</module>
     </modules>
 
     <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <junit.jupiter.version>5.11.3</junit.jupiter.version>
-        <surefire.version>3.2.5</surefire.version>
-        <jacoco.version>0.8.13</jacoco.version>
-        <sonal.version>3.11.0.3922</sonal.version>
+      <maven.compiler.source>25</maven.compiler.source>
+      <maven.compiler.target>25</maven.compiler.target>
+      <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+      <junit.jupiter.version>5.11.3</junit.jupiter.version>
+      <surefire.version>3.2.5</surefire.version>
+      <jacoco.version>0.8.13</jacoco.version>
+      <sonal.version>3.11.0.3922</sonal.version>
 
-        <!-- Single aggregated report for SonarQube -->
-        <sonar.coverage.jacoco.xmlReportPaths>
-            ${maven.multiModuleProjectDirectory}/nexus-coverage-report/target/site/jacoco-aggregate/jacoco.xml
-        </sonar.coverage.jacoco.xmlReportPaths>
+      <!-- Single aggregated report for SonarQube -->
+      <sonar.coverage.jacoco.xmlReportPaths>
+          ${maven.multiModuleProjectDirectory}/nexus-coverage-report/target/site/jacoco-aggregate/jacoco.xml
+      </sonar.coverage.jacoco.xmlReportPaths>
     </properties>
 
+    <distributionManagement>
+      <repository>
+        <id>github</id>
+        <name>GitHub Packages</name>
+        <url>https://maven.pkg.github.com/rui-tx/nexus</url>
+      </repository>
+    </distributionManagement>
+
     <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.12.1</version>
-                <configuration>
-                    <release>${maven.compiler.target}</release>
-                </configuration>
-            </plugin>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.12.1</version>
+          <configuration>
+            <release>${maven.compiler.target}</release>
+          </configuration>
+        </plugin>
 
-            <!-- JaCoCo Configuration -->
-            <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>${jacoco.version}</version>
-                <executions>
-                    <!-- Prepare agent for ALL child modules -->
-                    <execution>
-                        <id>prepare-agent</id>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                        <configuration>
-                            <destFile>${project.build.directory}/jacoco.exec</destFile>
-                        </configuration>
-                    </execution>
+        <!-- JaCoCo Configuration -->
+        <plugin>
+          <groupId>org.jacoco</groupId>
+          <artifactId>jacoco-maven-plugin</artifactId>
+          <version>${jacoco.version}</version>
+          <executions>
+            <!-- Prepare agent for ALL child modules -->
+            <execution>
+              <id>prepare-agent</id>
+              <goals>
+                <goal>prepare-agent</goal>
+              </goals>
+              <configuration>
+                <destFile>${project.build.directory}/jacoco.exec</destFile>
+              </configuration>
+            </execution>
 
-                    <!-- Generate individual report per module -->
-                    <execution>
-                        <id>report</id>
-                        <phase>test</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                    </execution>
+            <!-- Generate individual report per module -->
+            <execution>
+              <id>report</id>
+              <phase>test</phase>
+              <goals>
+                <goal>report</goal>
+              </goals>
+            </execution>
 
-                    <!-- Aggregate report ONLY in parent -->
-                    <execution>
-                        <id>report-aggregate</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>report-aggregate</goal>
-                        </goals>
-                        <inherited>false</inherited>
-                    </execution>
-                </executions>
-            </plugin>
+            <!-- Aggregate report ONLY in parent -->
+            <execution>
+              <id>report-aggregate</id>
+              <phase>verify</phase>
+              <goals>
+                <goal>report-aggregate</goal>
+              </goals>
+              <inherited>false</inherited>
+            </execution>
+          </executions>
+        </plugin>
 
-            <!-- Surefire Configuration -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${surefire.version}</version>
-                <configuration>
-                    <!-- Use late-binding for JaCoCo argLine -->
-                    <argLine>@{argLine}</argLine>
-                </configuration>
-            </plugin>
+        <!-- Surefire Configuration -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${surefire.version}</version>
+          <configuration>
+            <!-- Use late-binding for JaCoCo argLine -->
+            <argLine>@{argLine}</argLine>
+          </configuration>
+        </plugin>
 
-            <!-- Sonar -->
-            <plugin>
-                <groupId>org.sonarsource.scanner.maven</groupId>
-                <artifactId>sonar-maven-plugin</artifactId>
-                <version>${sonal.version}</version>
-            </plugin>
-        </plugins>
+        <!-- Sonar -->
+        <plugin>
+          <groupId>org.sonarsource.scanner.maven</groupId>
+          <artifactId>sonar-maven-plugin</artifactId>
+          <version>${sonal.version}</version>
+        </plugin>
+      </plugins>
     </build>
 </project>
