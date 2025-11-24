@@ -43,9 +43,11 @@ public class NexusServer {
    */
   public NexusServer(ServerConfig config) {
     this.config = config;
-    List<Middleware> defaults = new ArrayList<>();
-    defaults.add(new LoggingMiddleware());
-    this.middlewares = List.copyOf(defaults);
+    List<Middleware> all = new ArrayList<>();
+    all.add(new LoggingMiddleware()); //default middleware
+    all.addAll(config.getMiddlewares());
+
+    this.middlewares = List.copyOf(all);
     verifyRoutesAvailability();
   }
 

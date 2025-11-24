@@ -1,6 +1,10 @@
 package org.nexus.config;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 import org.nexus.NexusConfig;
+import org.nexus.interfaces.Middleware;
 
 /**
  * Configuration class for Nexus server.
@@ -12,6 +16,7 @@ public class ServerConfig {
   private final int idleTimeoutSeconds;
   private final int maxContentLength;
   private final SslConfig sslConfig;
+  private final List<Middleware> middlewares;
 
   private ServerConfig(Builder builder) {
     this.bindAddress = builder.bindAddress;
@@ -19,6 +24,7 @@ public class ServerConfig {
     this.idleTimeoutSeconds = builder.idleTimeoutSeconds;
     this.maxContentLength = builder.maxContentLength;
     this.sslConfig = builder.sslConfig;
+    this.middlewares = List.copyOf(builder.middlewares); // immutable
   }
 
   public static ServerConfig from(NexusConfig config) {
@@ -60,8 +66,13 @@ public class ServerConfig {
     return sslConfig != null;
   }
 
+  public List<Middleware> getMiddlewares() {
+    return middlewares;
+  }
+
   public static class Builder {
 
+    private final List<Middleware> middlewares = new ArrayList<>();
     private String bindAddress = "0.0.0.0";
     private int port = 15000;
     private int idleTimeoutSeconds = 300;
@@ -90,6 +101,23 @@ public class ServerConfig {
 
     public Builder sslConfig(SslConfig sslConfig) {
       this.sslConfig = sslConfig;
+      return this;
+    }
+
+    public Builder middleware(Middleware middleware) {
+      this.middlewares.add(Objects.requireNonNull(middleware));
+      return this;
+    }
+
+    public Builder middlewares(Middleware... middlewares) {
+      for (Middleware m : middlewares) {
+        this.middlewares.add(Objects.requireNonNull(m));
+      }
+      return this;
+    }
+
+    public Builder middlewares(List<Middleware> middlewares) {
+      this.middlewares.addAll(Objects.requireNonNull(middlewares));
       return this;
     }
 

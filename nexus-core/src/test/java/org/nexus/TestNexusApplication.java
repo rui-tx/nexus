@@ -1,6 +1,7 @@
 package org.nexus;
 
 import org.nexus.config.ServerConfig;
+import org.nexus.middleware.SecurityHeadersMiddleware;
 import org.nexus.server.NexusServer;
 
 /**
@@ -29,6 +30,7 @@ public class TestNexusApplication extends NexusApplication {
         .port(0)  // Auto-assign port
         .idleTimeoutSeconds(300)
         .maxContentLength(1_048_576)
+        .middleware(new SecurityHeadersMiddleware(true))
         .build();
     return this.serverConfig;
   }
