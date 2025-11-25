@@ -77,17 +77,13 @@ class NexusJwtTest {
   @Test
   void testGetJwtService_NotInitialized_ThrowsException() {
     // When/Then
-    assertThrows(IllegalStateException.class, () -> {
-      NexusJwt.getJwtService();
-    });
+    assertThrows(IllegalStateException.class, NexusJwt::getJwtService);
   }
 
   @Test
   void testGetJwtConfig_NotInitialized_ThrowsException() {
     // When/Then
-    assertThrows(IllegalStateException.class, () -> {
-      NexusJwt.getJwtConfig();
-    });
+    assertThrows(IllegalStateException.class, NexusJwt::getJwtConfig);
   }
 
   @Test

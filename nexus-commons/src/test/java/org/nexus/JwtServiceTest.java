@@ -148,7 +148,10 @@ class JwtServiceTest {
     JwtService shortLived = new JwtService(new JwtConfig(config));
     String token = shortLived.generateAccessToken("temp", null);
 
-    Thread.sleep(1100); // Wait for expiration
+    long endTime = System.currentTimeMillis() + 1100;
+    while (System.currentTimeMillis() < endTime) {
+      Thread.onSpinWait();
+    }
 
     assertFalse(shortLived.validateAccessToken(token));
   }

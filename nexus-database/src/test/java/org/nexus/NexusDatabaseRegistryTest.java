@@ -35,7 +35,7 @@ class NexusDatabaseRegistryTest {
   }
 
   @BeforeEach
-  void setUp() throws IOException {
+  void setUp() {
     resetNexusConfig();
     envFile = tempDir.resolve(".env");
   }
@@ -90,9 +90,8 @@ class NexusDatabaseRegistryTest {
     NexusDatabaseRegistry registry = new NexusDatabaseRegistry();
 
     // When & Then
-    IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-      registry.get("nonexistent");
-    });
+    IllegalStateException exception = assertThrows(
+        IllegalStateException.class, () -> registry.get("nonexistent"));
     assertTrue(exception.getMessage().contains("Unknown database"));
   }
 
@@ -114,9 +113,7 @@ class NexusDatabaseRegistryTest {
     NexusDatabaseRegistry registry = new NexusDatabaseRegistry();
 
     // When & Then
-    assertThrows(NullPointerException.class, () -> {
-      registry.get(null);
-    });
+    assertThrows(NullPointerException.class, () -> registry.get(null));
   }
 
   @Test
@@ -163,9 +160,8 @@ class NexusDatabaseRegistryTest {
     NexusDatabaseRegistry registry = new NexusDatabaseRegistry();
 
     // When & Then
-    IllegalStateException exception = assertThrows(IllegalStateException.class, () -> {
-      registry.getDefault();
-    });
+    IllegalStateException exception = assertThrows(IllegalStateException.class,
+        registry::getDefault);
     assertTrue(exception.getMessage().contains("No databases configured"));
   }
 
@@ -190,7 +186,7 @@ class NexusDatabaseRegistryTest {
     // and NexusConfig validates the type. The registry would need a way to inject
     // an invalid type, which isn't possible without mocks.
     // This test confirms that valid types work correctly.
-    assertDoesNotThrow(() -> new NexusDatabaseRegistry());
+    assertDoesNotThrow(NexusDatabaseRegistry::new);
   }
 
   @Test
@@ -218,7 +214,7 @@ class NexusDatabaseRegistryTest {
     assertNotNull(registry.get("db2"));
 
     // When
-    assertDoesNotThrow(() -> registry.close());
+    assertDoesNotThrow(registry::close);
 
     // Then
     // After closing, the registry itself doesn't prevent access to the NexusDatabase objects,
@@ -245,7 +241,7 @@ class NexusDatabaseRegistryTest {
     NexusDatabaseRegistry registry = new NexusDatabaseRegistry();
 
     // When & Then - close should not throw even if underlying connectors have issues
-    assertDoesNotThrow(() -> registry.close());
+    assertDoesNotThrow(registry::close);
   }
 
   @Test
