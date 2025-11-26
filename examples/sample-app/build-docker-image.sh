@@ -10,17 +10,8 @@ fi
 
 BINARY_NAME="nexus-sample-app-$VERSION"
 ARTIFACT_ID="nexus-sample-app"
-M2_REPO_BASE="$HOME/.m2/repository"
-TEMP_CACHE_DIR=".m2_local_cache"
 
-echo "Preparing local Maven artifacts for Docker build..."
-mkdir -p $TEMP_CACHE_DIR
-
-cp -R "$M2_REPO_BASE"/org $TEMP_CACHE_DIR/
-cp -R "$M2_REPO_BASE"/io $TEMP_CACHE_DIR/
-
-
-# Generate Dockerfile
+# Generate Dockerfile with dynamic binary name
 cat > Dockerfile <<EOF
 FROM vegardit/graalvm-maven:latest-java25 as builder
 
@@ -28,10 +19,6 @@ WORKDIR /app
 
 # Copy pom.xml
 COPY pom.xml .
-
-# .m2 copy
-COPY $TEMP_CACHE_DIR/org /root/.m2/repository/org
-COPY $TEMP_CACHE_DIR/io /root/.m2/repository/io
 
 # download dependencies, this layer will be cached
 RUN mvn compile -B
@@ -73,9 +60,6 @@ podman build --no-cache -t nexus-sample-app:"$VERSION" .
 podman tag nexus-sample-app:"$VERSION" nexus-sample-app:latest
 
 echo "Image generated with version: $VERSION"
-
-# Clean up the temporary cache directory after the build is done
-rm -rf $TEMP_CACHE_DIR
 
 # Optional: push to registry
 # podman tag localhost/nexus-sample-app:$REVISION docker.io/yourusername/nexus-sample-app:$REVISION

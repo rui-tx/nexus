@@ -21,6 +21,24 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+      <repository>
+        <id>github-nexus</id>
+        <!-- Encoded API read token from the project -->
+        <url>https://public:&#103;hp_kP4OdVpZnAWCBRPyg8PTjjGHTKo4zR1dWCsg@maven.pkg.github.com/rui-tx/*</url>
+        <snapshots>
+          <enabled>true</enabled>
+        </snapshots>
+      </repository>
+     <!-- local repo -->
+<!--      <repository>-->
+<!--        <id>local-nexus</id>-->
+<!--        <name>Local Nexus Repository</name>-->
+<!--        <url>file://${project.basedir}/lib/maven-repo</url>-->
+<!--      </repository>-->
+    </repositories>
+
+
     <dependencyManagement>
       <dependencies>
         <dependency>
@@ -39,14 +57,6 @@
         <artifactId>nexus-starter</artifactId>
       </dependency>
     </dependencies>
-
-    <repositories>
-        <repository>
-            <id>local-nexus</id>
-            <name>Local Nexus Repository</name>
-            <url>file://${project.basedir}/lib/maven-repo</url>
-        </repository>
-    </repositories>
 
    <build>
      <plugins>

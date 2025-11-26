@@ -124,6 +124,9 @@ Example Controller <-> Service <-> Repository
 @Singleton
 public class Controller {
 
+  public static final String API_VERSION = "v1";
+
+  private static final String BASE_URL = "/api/" + API_VERSION;
   private final Service service;
 
   @Inject
@@ -131,17 +134,17 @@ public class Controller {
     this.service = service;
   }
 
-  @Mapping(type = HttpMethod.GET, endpoint = "/echo")
-  public CompletableFuture<Response<String>> echo() {
-    return CompletableFuture.supplyAsync(service::echo, NexusExecutor.get());
+  @Mapping(type = HttpMethod.GET, endpoint = BASE_URL)
+  public CompletableFuture<Response<String>> ping() {
+    return CompletableFuture.supplyAsync(service::pong, NexusExecutor.get());
   }
 
-  @Mapping(type = HttpMethod.GET, endpoint = "/entry/:name")
+  @Mapping(type = HttpMethod.GET, endpoint = BASE_URL + "/entry/:name")
   public CompletableFuture<Response<String>> getSample(String name) {
     return service.getSample(name);
   }
 
-  @Mapping(type = HttpMethod.POST, endpoint = "/entry/:name")
+  @Mapping(type = HttpMethod.POST, endpoint = BASE_URL + "/entry/:name")
   public CompletableFuture<Response<String>> postSample(String name) {
     return service.postSample(name);
   }
@@ -154,7 +157,10 @@ public class Controller {
 public class Service {
 
   static {
-    NexusStaticResponseRegistry.register("echo", "OK", 200);
+    NexusStaticResponseRegistry.register(
+        "ping-pong",
+        new ApiVersion("sample-app", API_VERSION), 200
+    );
   }
 
   private final Repository repository;
@@ -164,9 +170,9 @@ public class Service {
     this.repository = repository;
   }
 
-  public Response<String> echo() {
-    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("echo");
-    return new CachedHttpResponse(preComputed);
+  public Response<String> pong() {
+    FullHttpResponse preComputed = NexusStaticResponseRegistry.get("ping-pong");
+    return new CachedHttpResponse<>(preComputed);
   }
 
   public CompletableFuture<Response<String>> getSample(String name) {
@@ -187,6 +193,10 @@ public class Service {
       String body = String.valueOf(inserted);
       return new Response<>(201, body);
     });
+  }
+
+  public record ApiVersion(String name, String version) {
+
   }
 }
 ```

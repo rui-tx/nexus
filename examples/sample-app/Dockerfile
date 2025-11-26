@@ -5,13 +5,6 @@ WORKDIR /app
 # Copy pom.xml
 COPY pom.xml .
 
-# --- START TARGETED .m2 COPY FROM BUILD CONTEXT ---
-# Now copy is relative to the build context, which Podman can always access.
-# The target path must be the full /root/.m2/repository
-COPY .m2_local_cache/org /root/.m2/repository/org
-COPY .m2_local_cache/io /root/.m2/repository/io
-# --- END TARGETED .m2 COPY FROM BUILD CONTEXT ---
-
 # download dependencies, this layer will be cached
 RUN mvn compile -B
 
