@@ -18,8 +18,9 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LoadTests {
@@ -77,79 +78,37 @@ class LoadTests {
     NexusConfig.closeInstance();
   }
 
-  @Test
+  private static String singleLoad(String url) throws Exception {
+    HttpResponse<String> res = httpClient.send(
+        HttpRequest.newBuilder(URI.create(url)).GET().build(),
+        HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, res.statusCode());
+    return res.body();
+  }
+
+  @ParameterizedTest(name = "{0} load - limit {1}")
   @Order(1)
-  void single_lightLoad_returns200() throws Exception {
-    HttpResponse<String> res = httpClient.send(
-        HttpRequest.newBuilder(URI.create(baseUrl + "/primes/100000")).GET().build(),
-        HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, res.statusCode());
-    System.out.println(res.body());
-    assertTrue(res.body().contains("Found 9592 primes"));
+  @CsvSource({
+      "light, 100000, 9592",
+      "medium, 1000000, 78498",
+      "heavy, 5000000, 348513"
+  })
+  void single_load_returns200(String loadType, int limit, int expectedPrimes) throws Exception {
+    String response = singleLoad(baseUrl + "/primes/" + limit);
+    System.out.println(response);
+    assertTrue(response.contains("Found " + expectedPrimes + " primes"));
   }
 
-  @Test
+  @ParameterizedTest(name = "{0} load - {1} concurrent connections")
   @Order(2)
-  void single_mediumLoad_returns200() throws Exception {
-    HttpResponse<String> res = httpClient.send(
-        HttpRequest.newBuilder(URI.create(baseUrl + "/primes/1000000")).GET().build(),
-        HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, res.statusCode());
-    System.out.println(res.body());
-    assertTrue(res.body().contains("Found 78498 primes"));
-  }
-
-  @Test
-  @Order(3)
-  void single_heavyLoad_returns200() throws Exception {
-    HttpResponse<String> res = httpClient.send(
-        HttpRequest.newBuilder(URI.create(baseUrl + "/primes/5000000")).GET().build(),
-        HttpResponse.BodyHandlers.ofString());
-    assertEquals(200, res.statusCode());
-    System.out.println(res.body());
-    assertTrue(res.body().contains("Found 348513 primes"));
-  }
-
-  @Test
-  @Order(4)
-  void concurrent_lightLoad_returns200() throws Exception {
-    int numberOfConnections = 50;
-    int numberToTest = 1_000_000;
-    String expectedResponse = "Found 78498 primes";
-
-    testConcurrentRequests(
-        numberOfConnections,
-        baseUrl + "/primes/" + numberToTest,
-        response -> {
-          assertEquals(200, response.statusCode());
-          assertTrue(response.body().contains(expectedResponse));
-        }
-    );
-  }
-
-  @Test
-  @Order(5)
-  void concurrent_mediumLoad_returns200() throws Exception {
-    int numberOfConnections = 100;
-    int numberToTest = 1_000_000;
-    String expectedResponse = "Found 78498 primes";
-
-    testConcurrentRequests(
-        numberOfConnections,
-        baseUrl + "/primes/" + numberToTest,
-        response -> {
-          assertEquals(200, response.statusCode());
-          assertTrue(response.body().contains(expectedResponse));
-        }
-    );
-  }
-
-  @Test
-  @Order(6)
-  void concurrent_heavyLoad_returns200() throws Exception {
-    int numberOfConnections = 250;
-    int numberToTest = 1_000_000;
-    String expectedResponse = "Found 78498 primes";
+  @CsvSource({
+      "light, 50, 1000000, 78498",
+      "medium, 100, 1000000, 78498",
+      "heavy, 250, 1000000, 78498"
+  })
+  void concurrent_load_returns200(String loadType, int numberOfConnections, int numberToTest,
+      int expectedPrimes) throws Exception {
+    String expectedResponse = "Found " + expectedPrimes + " primes";
 
     testConcurrentRequests(
         numberOfConnections,
@@ -167,7 +126,7 @@ class LoadTests {
       Consumer<HttpResponse<String>> responseValidator) throws Exception {
     // Create a list of CompletableFuture for each request
     List<CompletableFuture<HttpResponse<String>>> futures = IntStream.range(0, numberOfConnections)
-        .mapToObj(i ->
+        .mapToObj(_ ->
             CompletableFuture.supplyAsync(() -> {
               try {
                 return httpClient.send(
@@ -187,7 +146,7 @@ class LoadTests {
     List<HttpResponse<String>> responses = CompletableFuture.allOf(
             futures.toArray(new CompletableFuture[0])
         )
-        .thenApply(v ->
+        .thenApply(_ ->
             futures.stream()
                 .map(CompletableFuture::join)
                 .toList()

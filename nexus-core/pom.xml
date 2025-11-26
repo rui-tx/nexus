@@ -59,6 +59,12 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-params</artifactId>
+      <scope>test</scope>
+    </dependency>
+
     <!-- Test scope needs annotation types and DI annotations -->
     <dependency>
       <groupId>org.nexus</groupId>

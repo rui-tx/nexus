@@ -733,7 +733,7 @@ class NexusDatabaseMigratorTest {
           try (var stmt = conn.createStatement()) {
             stmt.executeQuery("SELECT COUNT(*) FROM migrations");
             return true;
-          } catch (SQLException e) {
+          } catch (SQLException _) {
             return false;
           }
         });

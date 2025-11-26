@@ -31,19 +31,15 @@ final class ReflectionConfigGenerator {
   private static final String FILE_NAME = "generated-reflect-config.json";
   private static final String FILE_PATH = "META-INF/native-image/%s".formatted(FILE_NAME);
 
-  //private final ProcessingEnvironment processingEnv;
   private final Messager messager;
   private final Filer filer;
-  //private final Types typeUtils;
   private final Elements elementUtils;
   private final Set<String> processedTypes = new HashSet<>();
   private final List<ReflectionEntry> entries = new ArrayList<>();
 
   ReflectionConfigGenerator(ProcessingEnvironment processingEnv) {
-    //this.processingEnv = processingEnv;
     this.messager = processingEnv.getMessager();
     this.filer = processingEnv.getFiler();
-    //this.typeUtils = processingEnv.getTypeUtils();
     this.elementUtils = processingEnv.getElementUtils();
   }
 
@@ -87,16 +83,14 @@ final class ReflectionConfigGenerator {
    * Creates a reflection entry for a type element.
    */
   private ReflectionEntry createReflectionEntry(TypeElement typeElement) {
-    ReflectionEntry entry = new ReflectionEntry();
-
-    entry.name = elementUtils.getBinaryName(typeElement).toString();
-    entry.allDeclaredConstructors = true;
-    entry.allDeclaredMethods = true;
-    entry.allDeclaredFields = true;
-    entry.queryAllDeclaredConstructors = true;
-    entry.queryAllPublicConstructors = true;
-
-    return entry;
+    return new ReflectionEntry(
+        elementUtils.getBinaryName(typeElement).toString(),
+        true,
+        true,
+        true,
+        true,
+        true
+    );
   }
 
   /**
@@ -145,13 +139,12 @@ final class ReflectionConfigGenerator {
         if (!declaredType.getTypeArguments().isEmpty()) {
           TypeMirror futureTypeArg = declaredType.getTypeArguments().getFirst();
           if (futureTypeArg.toString().startsWith("org.nexus.Response<")) {
-            if (futureTypeArg instanceof DeclaredType responseType) {
-              if (!responseType.getTypeArguments().isEmpty()) {
-                TypeMirror responseTypeArg = responseType.getTypeArguments().getFirst();
-                messager.printMessage(Kind.NOTE,
-                    "Processing response type: " + responseTypeArg);
-                processTypeRecursively(responseTypeArg);
-              }
+            if ((futureTypeArg instanceof DeclaredType responseType)
+                && !responseType.getTypeArguments().isEmpty()) {
+              TypeMirror responseTypeArg = responseType.getTypeArguments().getFirst();
+              messager.printMessage(Kind.NOTE,
+                  "Processing response type: " + responseTypeArg);
+              processTypeRecursively(responseTypeArg);
             }
           } else {
             // Process the type argument directly if it's not a Response
@@ -345,8 +338,8 @@ final class ReflectionConfigGenerator {
   private String getQualifiedName(TypeMirror type) {
     if (type instanceof DeclaredType declaredType) {
       Element element = declaredType.asElement();
-      if (element instanceof TypeElement) {
-        return ((TypeElement) element).getQualifiedName().toString();
+      if (element instanceof TypeElement typeelement) {
+        return typeelement.getQualifiedName().toString();
       }
     }
     return type.toString();
@@ -355,8 +348,8 @@ final class ReflectionConfigGenerator {
   private TypeElement getTypeElement(TypeMirror type) {
     if (type instanceof DeclaredType declaredType) {
       Element element = declaredType.asElement();
-      if (element instanceof TypeElement) {
-        return (TypeElement) element;
+      if (element instanceof TypeElement typeelement) {
+        return typeelement;
       }
     }
     return null;
@@ -386,13 +379,13 @@ final class ReflectionConfigGenerator {
         typeName.startsWith("java.util.Collection");
   }
 
-  private static class ReflectionEntry {
+  private record ReflectionEntry(
+      String name,
+      Boolean allDeclaredConstructors,
+      Boolean allDeclaredMethods,
+      Boolean allDeclaredFields,
+      Boolean queryAllDeclaredConstructors,
+      Boolean queryAllPublicConstructors) {
 
-    public String name;
-    public Boolean allDeclaredConstructors;
-    public Boolean allDeclaredMethods;
-    public Boolean allDeclaredFields;
-    public Boolean queryAllDeclaredConstructors;
-    public Boolean queryAllPublicConstructors;
   }
 }

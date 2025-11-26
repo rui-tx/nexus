@@ -451,7 +451,7 @@ class NexusDatabaseTest {
         // This should fail due to unique constraint
         database.update("INSERT INTO users (name, email, age) VALUES (?, ?, ?)",
             "Bob", "alice@example.com", 30);
-      } catch (DatabaseException e) {
+      } catch (DatabaseException _) {
         database.rollbackTransaction();
       }
 
