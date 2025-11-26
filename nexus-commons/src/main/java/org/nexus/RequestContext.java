@@ -98,7 +98,7 @@ public final class RequestContext {
 
   public void setAttribute(String key, Object value) {
     if (attributes == null) {
-      attributes = new HashMap<>(4);
+      attributes = HashMap.newHashMap(4);
     }
     attributes.put(key, value);
   }

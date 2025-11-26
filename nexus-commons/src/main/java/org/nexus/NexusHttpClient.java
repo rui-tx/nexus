@@ -2,15 +2,19 @@ package org.nexus;
 
 import java.net.http.HttpClient;
 
-public enum NexusHttpClient {
-  INSTANCE;
+public final class NexusHttpClient {
 
-  private final HttpClient httpClient = HttpClient.newBuilder()
-      .executor(NexusExecutor.INSTANCE.get())
-      .build();
-
-  public HttpClient get() {
-    return httpClient;
+  private NexusHttpClient() {
   }
-  
+
+  public static HttpClient get() {
+    return InstanceHolder.instance;
+  }
+
+  private static final class InstanceHolder {
+
+    private static final HttpClient instance = HttpClient.newBuilder()
+        .executor(NexusExecutor.get())
+        .build();
+  }
 }

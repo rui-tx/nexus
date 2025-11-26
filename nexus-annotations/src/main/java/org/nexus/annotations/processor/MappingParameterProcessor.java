@@ -1,5 +1,7 @@
 package org.nexus.annotations.processor;
 
+import static org.nexus.annotations.processor.MappingProcessorConstants.COMMA_SPACE;
+
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -16,21 +18,17 @@ final class MappingParameterProcessor {
   private final List<String> parameterNames = new ArrayList<>();
   private final List<String> placeholders;
   private final String endpoint;
-  private final String spacer = "  ";
-  //private final ExecutableElement method;
   private int placeholderIndex = 0;
 
   MappingParameterProcessor(ProcessingEnvironment processingEnv,
-//      ExecutableElement method,
       List<String> placeholders,
       String endpoint) {
     this.processingEnv = processingEnv;
-    //this.method = method;
     this.placeholders = placeholders;
     this.endpoint = endpoint;
   }
 
-  void processParameter(VariableElement param, int paramIndex) {
+  void processParameter(VariableElement param) {
     String paramName = param.getSimpleName().toString();
     String typeName = param.asType().toString();
 
@@ -58,17 +56,17 @@ final class MappingParameterProcessor {
   private void processQueryParam(VariableElement param, QueryParam qp,
       String paramName, String typeName) {
     String qpName = qp.value();
-    boolean isList = MappingProcessorUtils.isListType(param.asType(), processingEnv.getTypeUtils());
+    boolean isList = MappingProcessorUtils.isListType(param.asType());
 
     if (isList) {
-      processListQueryParam(param, qpName, paramName, typeName);
+      processListQueryParam(param, qpName, paramName);
     } else {
       processScalarQueryParam(qp, qpName, paramName, typeName);
     }
   }
 
   private void processListQueryParam(VariableElement param, String qpName,
-      String paramName, String typeName) {
+      String paramName) {
     String elemType = MappingProcessorUtils.getListElementType(param.asType());
     String listType = "java.util.List<" + elemType + ">";
     String listRaw = "rc.getQueryParams(\"" + qpName + "\")";
@@ -83,10 +81,10 @@ final class MappingParameterProcessor {
     switch (elemType) {
       case MappingProcessorConstants.TYPE_INT -> paramCode.append(paramName)
           .append(".add(safeParseIntQuery(v, \"").append(qpName)
-          .append("\", \"").append(endpoint).append("\"));");
+          .append(COMMA_SPACE).append(endpoint).append("\"));");
       case MappingProcessorConstants.TYPE_LONG -> paramCode.append(paramName)
           .append(".add(safeParseLongQuery(v, \"").append(qpName)
-          .append("\", \"").append(endpoint).append("\"));");
+          .append(COMMA_SPACE).append(endpoint).append("\"));");
       default ->  // String
           paramCode.append(paramName).append(".add(v);");
     }
@@ -108,28 +106,41 @@ final class MappingParameterProcessor {
     String paramType = param.asType().toString();
     String paramName = param.getSimpleName().toString();
 
-    paramCode
-        .append(paramType).append(" ").append(paramName).append(";")
-        .append(" try {");
-    paramCode.append(paramName)
-        .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);");
-    paramCode.append(" } catch (JsonProcessingException e) {");
-    paramCode.append(" throw new ProblemDetailsException(");
-    paramCode.append(" new ProblemDetails.Single(");
-    paramCode.append(" ProblemDetailsTypes.CLIENT_ERROR,");
-    paramCode.append(" \"Invalid request\",");
-    paramCode.append(" 400,");
-    paramCode.append(" \"Invalid JSON request body: \" + e.getMessage(),");
-    paramCode.append(" \"\",");
-    paramCode.append(" Map.of()");
-    paramCode.append(" )");
-    paramCode.append(" );");
-    paramCode.append(" }");
+    // For generic types, we need to use TypeReference to properly handle type erasure
+    if (paramType.contains("<")) {
+      // For generic types, use TypeReference
+      String typeRef = "new com.fasterxml.jackson.core.type.TypeReference<" + paramType + ">() {}";
+      paramCode
+          .append(paramType).append(" ").append(paramName).append(";")
+          .append(" try {")
+          .append(paramName)
+          .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(typeRef).append(");");
+    } else {
+      // For non-generic types, we can use .class
+      paramCode
+          .append(paramType).append(" ").append(paramName).append(";")
+          .append(" try {")
+          .append(paramName)
+          .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(paramType).append(".class);");
+    }
+
+    paramCode.append(" } catch (JsonProcessingException e) {")
+        .append(" throw new ProblemDetailsException(")
+        .append(" new ProblemDetails.Single(")
+        .append(" ProblemDetailsTypes.CLIENT_ERROR,")
+        .append(" \"Invalid request\",")
+        .append(" 400,")
+        .append(" \"Invalid JSON request body: \" + e.getMessage(),")
+        .append(" \"\",")
+        .append(" Map.of()")
+        .append(" )")
+        .append(" );")
+        .append(" }");
   }
 
   private String buildQueryParamValueExpression(QueryParam qp, String qpName, String raw) {
     if (qp.required()) {
-      return "requireQueryParam(" + raw + ", \"" + qpName + "\", \"" + endpoint + "\")";
+      return "requireQueryParam(" + raw + ", \"" + qpName + COMMA_SPACE + endpoint + "\")";
     } else if (!qp.defaultValue().isEmpty()) {
       return "(" + raw + " != null && !" + raw + ".isEmpty()) ? " + raw + " : \""
           + MappingProcessorUtils.escapeJavaString(qp.defaultValue()) + "\"";
@@ -141,9 +152,9 @@ final class MappingParameterProcessor {
     return switch (typeName) {
       case MappingProcessorConstants.TYPE_STRING -> valueExpr;
       case "int", MappingProcessorConstants.TYPE_INT ->
-          "safeParseIntQuery(" + valueExpr + ", \"" + paramName + "\", \"" + endpoint + "\")";
+          "safeParseIntQuery(" + valueExpr + ", \"" + paramName + COMMA_SPACE + endpoint + "\")";
       case "long", MappingProcessorConstants.TYPE_LONG ->
-          "safeParseLongQuery(" + valueExpr + ", \"" + paramName + "\", \"" + endpoint + "\")";
+          "safeParseLongQuery(" + valueExpr + ", \"" + paramName + COMMA_SPACE + endpoint + "\")";
       default ->
           throw new IllegalArgumentException("Unsupported query parameter type: " + typeName);
     };
@@ -173,9 +184,9 @@ final class MappingParameterProcessor {
     return switch (typeName) {
       case MappingProcessorConstants.TYPE_STRING -> rawValue;
       case "int", MappingProcessorConstants.TYPE_INT ->
-          "safeParseInt(" + rawValue + ", \"" + placeholder + "\", \"" + endpoint + "\")";
+          "safeParseInt(" + rawValue + ", \"" + placeholder + COMMA_SPACE + endpoint + "\")";
       case "long", MappingProcessorConstants.TYPE_LONG ->
-          "safeParseLong(" + rawValue + ", \"" + placeholder + "\", \"" + endpoint + "\")";
+          "safeParseLong(" + rawValue + ", \"" + placeholder + COMMA_SPACE + endpoint + "\")";
       default -> throw new IllegalArgumentException("Unsupported path parameter type: " + typeName);
     };
   }

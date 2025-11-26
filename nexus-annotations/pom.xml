@@ -7,10 +7,12 @@
   <parent>
     <groupId>org.nexus</groupId>
     <artifactId>nexus</artifactId>
-    <version>${revision}</version>
+    <version>0.1-ALPHA-SNAPSHOT</version>
   </parent>
 
   <artifactId>nexus-annotations</artifactId>
+  <packaging>jar</packaging>
+  <name>Nexus Annotations</name>
 
   <dependencyManagement>
     <dependencies>
@@ -33,6 +35,18 @@
     <dependency>
       <groupId>io.avaje</groupId>
       <artifactId>avaje-inject</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>com.google.testing.compile</groupId>
+      <artifactId>compile-testing</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

@@ -14,8 +14,9 @@ public sealed interface ProblemDetails permits ProblemDetails.Single, ProblemDet
 
   default int getStatus() {
     return switch (this) {
-      case Single s -> Objects.requireNonNullElse(s.status(), 500);
-      case Multiple m -> m.problems().stream()
+      case Single(_, _, Integer status, _, _, _) -> Objects.requireNonNullElse(status, 500);
+
+      case Multiple(List<ProblemDetails.Single> problems) -> problems.stream()
           .mapToInt(s -> Objects.requireNonNullElse(s.status(), 500))
           .findFirst()
           .orElse(500);

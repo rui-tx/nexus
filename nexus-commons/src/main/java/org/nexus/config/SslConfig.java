@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
-import java.security.KeyStoreException;
 import java.util.Arrays;
 import java.util.List;
 import javax.net.ssl.KeyManagerFactory;
@@ -156,14 +155,15 @@ public final class SslConfig {
     SslContext context = builder.build();
 
     LOGGER.debug("SSL context initialized successfully");
-    LOGGER.debug("  Protocols: {}", Arrays.toString(SECURE_PROTOCOLS));
+    String protocols = Arrays.toString(SECURE_PROTOCOLS);
+    LOGGER.debug("  Protocols: {}", protocols);
     LOGGER.debug("  Cipher suites: {} configured", SECURE_CIPHERS.size());
     LOGGER.debug("  Client auth: {}", requireClientAuth ? "REQUIRED" : "OPTIONAL");
 
     return context;
   }
 
-  private KeyStore loadKeyStore() throws KeyStoreException, IOException, GeneralSecurityException {
+  private KeyStore loadKeyStore() throws IOException, GeneralSecurityException {
     KeyStore keyStore = KeyStore.getInstance("PKCS12");
     try (InputStream keystoreStream = new FileInputStream(keystorePath)) {
       keyStore.load(keystoreStream, keystorePassword.toCharArray());

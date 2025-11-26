@@ -6,12 +6,15 @@ import org.nexus.NexusConfig;
 import org.nexus.config.db.DatabaseConfig;
 import org.nexus.exceptions.DatabaseException;
 import org.nexus.interfaces.DatabaseConnector;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Factory for creating database connectors based on configuration.
  */
 public final class DatabaseConnectorFactory {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseConnectorFactory.class);
   private static final Map<String, DatabaseConnector> connectorCache = new ConcurrentHashMap<>();
   private static final NexusConfig config = NexusConfig.getInstance();
 
@@ -50,7 +53,20 @@ public final class DatabaseConnectorFactory {
       throw new IllegalArgumentException("Database configuration cannot be null");
     }
 
-    return connectorCache.computeIfAbsent(config.name(), k -> createNewConnector(config));
+    return connectorCache.computeIfAbsent(config.name(), _ -> createNewConnector(config));
+  }
+
+  /**
+   * Create a new, non-cached database connector. Useful for migrations or temporary connections.
+   *
+   * @param config The database configuration
+   * @return A new DatabaseConnector instance (not cached)
+   */
+  public static DatabaseConnector createNonCached(DatabaseConfig config) {
+    if (config == null) {
+      throw new IllegalArgumentException("Database configuration cannot be null");
+    }
+    return createNewConnector(config);
   }
 
   private static DatabaseConnector createNewConnector(DatabaseConfig config) {
@@ -73,8 +89,7 @@ public final class DatabaseConnectorFactory {
       try {
         entry.getValue().close();
       } catch (Exception e) {
-        System.err.println(
-            "Error closing database connector " + entry.getKey() + ": " + e.getMessage());
+        LOGGER.error("Error closing database connector {}: {}", entry.getKey(), e.getMessage());
       }
     }
     connectorCache.clear();

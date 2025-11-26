@@ -8,8 +8,7 @@ public final class NexusBeanScope {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NexusBeanScope.class);
 
-
-  private static volatile BeanScope scope;
+  private static BeanScope scope;
 
   private NexusBeanScope() {
   }
@@ -20,15 +19,19 @@ public final class NexusBeanScope {
       return;
     }
 
+    LOGGER.info("Initializing BeanScope...");
     scope = BeanScope.builder().build();
+
+    for (var b : scope.all()) {
+      LOGGER.debug("  - Beans: {}", b);
+    }
   }
 
-  public static BeanScope get() {
+  public static synchronized BeanScope get() {
     if (scope == null) {
       throw new IllegalStateException(
           "BeanScope not initialized. Call NexusBeanScope.init() during startup");
     }
-
     return scope;
   }
 

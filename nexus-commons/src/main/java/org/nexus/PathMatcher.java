@@ -21,11 +21,6 @@ import java.util.regex.Pattern;
  */
 public final class PathMatcher {
 
-  /**
-   * One segment that is either a literal string or a ":name" placeholder
-   */
-  private static final Pattern SEGMENT = Pattern.compile("([^/:]+)|:([^/:]+)");
-
   private PathMatcher() {
   }   // utility class
 

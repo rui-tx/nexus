@@ -10,4 +10,7 @@ public class NexusUtils {
       new ObjectMapper()
           .enable(SerializationFeature.INDENT_OUTPUT);
 
+  private NexusUtils() {
+  }
+
 }

@@ -7,10 +7,12 @@
   <parent>
     <groupId>org.nexus</groupId>
     <artifactId>nexus</artifactId>
-    <version>${revision}</version>
+    <version>0.1-ALPHA-SNAPSHOT</version>
   </parent>
 
   <artifactId>nexus-commons</artifactId>
+  <packaging>jar</packaging>
+  <name>Nexus Commons</name>
 
   <dependencyManagement>
     <dependencies>
@@ -41,6 +43,30 @@
       <groupId>ch.qos.logback</groupId>
       <artifactId>logback-classic</artifactId>
       <scope>compile</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <dependency>

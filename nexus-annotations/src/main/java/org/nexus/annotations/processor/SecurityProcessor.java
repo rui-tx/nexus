@@ -13,7 +13,9 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import org.nexus.SecurityRule;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.Secured;
@@ -25,9 +27,11 @@ public final class SecurityProcessor extends AbstractProcessor {
   private static final String GENERATED_PACKAGE = "org.nexus";
   private static final String CONFIG_CLASS = "GeneratedSecurityRules";
 
+  private boolean hasGenerated = false;
+
   @Override
   public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-    if (roundEnv.processingOver()) {
+    if (roundEnv.processingOver() || hasGenerated) {
       return false;
     }
 
@@ -37,10 +41,11 @@ public final class SecurityProcessor extends AbstractProcessor {
         processElement(element, rules);
       }
 
-      // Generate the security configuration
-      if (!rules.isEmpty()) {
-        generateSecurityConfig(rules);
-      }
+      // Always generate the security configuration (even if empty)
+      generateSecurityConfig(rules);
+      writeServiceProvider();
+
+      hasGenerated = true; // Set flag after successful generation
     } catch (Exception e) {
       processingEnv.getMessager().printMessage(
           Diagnostic.Kind.ERROR,
@@ -157,8 +162,9 @@ public final class SecurityProcessor extends AbstractProcessor {
           import org.nexus.PathMatcher.CompiledPattern;
           import org.nexus.PathMatcher.Result;
           import org.nexus.SecurityRule;
+          import org.nexus.SecurityResolver;
           
-          public final class %s {
+          public final class %s implements SecurityResolver.SecurityRulesProvider {
             private static final Map<String, SecurityRule> exactRules = new HashMap<>();
             private static final Map<String, List<CompiledSecurityRule>> dynamicRulesByMethod = new HashMap<>();
           
@@ -168,7 +174,8 @@ public final class SecurityProcessor extends AbstractProcessor {
               %s
             }
           
-            public static SecurityRule getRule(String httpMethod, String path) {
+            @Override
+            public SecurityRule getRule(String httpMethod, String path) {
               String normPath = PathMatcher.normalise(path);
               String key = httpMethod.toUpperCase() + " " + normPath;
               SecurityRule exact = exactRules.get(key);
@@ -207,5 +214,16 @@ public final class SecurityProcessor extends AbstractProcessor {
       return "";
     }
     return "\"" + String.join("\", \"", items) + "\"";
+  }
+
+  private void writeServiceProvider() throws IOException {
+    String servicePath = "META-INF/services/org.nexus.SecurityResolver$SecurityRulesProvider";
+    FileObject fo = processingEnv.getFiler()
+        .createResource(StandardLocation.CLASS_OUTPUT, "", servicePath);
+    try (PrintWriter w = new PrintWriter(fo.openWriter())) {
+      w.println(GENERATED_PACKAGE + "." + CONFIG_CLASS);
+    }
+    processingEnv.getMessager()
+        .printMessage(Diagnostic.Kind.NOTE, "Security Service provider written: " + servicePath);
   }
 }

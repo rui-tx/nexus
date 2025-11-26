@@ -1,5 +1,6 @@
 package org.nexus;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +20,7 @@ public final class NexusConfig {
   private final Map<String, String> config = new HashMap<>();
   private final Map<String, DatabaseConfig> databaseConfigs = new HashMap<>();
   private boolean initialized = false;
+  private String envFilePath = ".env"; // Default path
 
   private NexusConfig() {
   }
@@ -30,6 +32,25 @@ public final class NexusConfig {
     return instance;
   }
 
+  public static synchronized void closeInstance() {
+    if (instance != null) {
+      instance.config.clear();
+      instance.databaseConfigs.clear();
+      instance.initialized = false;  // Reset the flag
+      instance = null;
+    }
+  }
+
+  /**
+   * Sets the .env file path (for testing purposes). Must be called before init().
+   */
+  public void setEnvFilePath(String path) {
+    if (initialized) {
+      throw new IllegalStateException("Cannot change env file path after initialization");
+    }
+    this.envFilePath = path;
+  }
+
   public synchronized void init(String[] args) {
     if (initialized) {
       return;
@@ -39,7 +60,7 @@ public final class NexusConfig {
 
     config.putAll(System.getenv());
     LOGGER.debug("Loaded {} system environment variables", config.size());
-    loadEnvFile(".env");
+    loadEnvFile(envFilePath);
     parseCommandLineArgs(args);
 
     // load database configurations
@@ -59,7 +80,8 @@ public final class NexusConfig {
         String[] parts = arg.substring(2).split("=", 2);
         if (parts.length == 2) {
           config.put(parts[0], parts[1]);
-          LOGGER.debug("Set config from CLI: {}={}", parts[0], "*".repeat(parts[1].length()));
+          String obfuscated = "*".repeat(parts[1].length());
+          LOGGER.debug("Set config from CLI: {}={}", parts[0], obfuscated);
         } else {
           config.put(parts[0], "true");
           LOGGER.debug("Set flag from CLI: {}", parts[0]);
@@ -77,19 +99,21 @@ public final class NexusConfig {
 
     Properties props = new Properties();
     try {
-      props.load(Files.newBufferedReader(envPath));
-      int count = 0;
-      for (var entry : props.entrySet()) {
-        if (entry.getKey() != null && entry.getValue() != null) {
-          String key = entry.getKey().toString();
-          String value = entry.getValue().toString();
-          config.put(key, value);
-          count++;
-          LOGGER.trace("Loaded from .env: {}={}", key,
-              key.toLowerCase().contains("password") ? "*****" : value);
+      try (BufferedReader reader = Files.newBufferedReader(envPath)) {
+        props.load(reader);
+        int count = 0;
+        for (var entry : props.entrySet()) {
+          if (entry.getKey() != null && entry.getValue() != null) {
+            String key = entry.getKey().toString();
+            String value = entry.getValue().toString();
+            config.put(key, value);
+            count++;
+            LOGGER.trace("Loaded from .env: {}={}", key,
+                key.toLowerCase().contains("password") ? "*****" : value);
+          }
         }
+        LOGGER.debug("Loaded {} parameters from {}", count, envPath.getFileName());
       }
-      LOGGER.debug("Loaded {} parameters from {}", count, envPath.getFileName());
     } catch (IOException e) {
       LOGGER.warn("Failed to load .env file: {}", e.getMessage());
     }
@@ -113,7 +137,7 @@ public final class NexusConfig {
       try {
         type = DatabaseType.valueOf(get(prefix + "TYPE", "POSTGRES").toUpperCase());
         LOGGER.debug("Database '{}' type: {}", name, type);
-      } catch (IllegalArgumentException e) {
+      } catch (IllegalArgumentException _) {
         LOGGER.warn("Invalid database type for {}, defaulting to POSTGRES", prefix);
         type = DatabaseType.POSTGRES;
       }
@@ -135,11 +159,11 @@ public final class NexusConfig {
 
   // Database configuration access
   public DatabaseConfig getDatabaseConfig(String name) {
-    DatabaseConfig config = databaseConfigs.get(name);
-    if (config == null) {
+    DatabaseConfig c = databaseConfigs.get(name);
+    if (c == null) {
       throw new IllegalStateException("No database configuration found for: " + name);
     }
-    return config;
+    return c;
   }
 
   public Map<String, DatabaseConfig> getAllDatabaseConfigs() {
@@ -158,7 +182,7 @@ public final class NexusConfig {
     try {
       String value = get(key);
       return value != null ? Integer.parseInt(value) : defaultValue;
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       LOGGER.warn("Invalid integer value for '{}', using default: {}", key, defaultValue);
       return defaultValue;
     }
@@ -176,14 +200,9 @@ public final class NexusConfig {
     try {
       String value = get(key);
       return value != null ? Long.parseLong(value) : defaultValue;
-    } catch (NumberFormatException e) {
+    } catch (NumberFormatException _) {
       LOGGER.warn("Invalid long value for '{}', using default: {}", key, defaultValue);
       return defaultValue;
     }
-  }
-
-  // For debugging and testing
-  Map<String, String> getAll() {
-    return new HashMap<>(config);
   }
 }

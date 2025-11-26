@@ -17,6 +17,9 @@ public class NexusStaticResponseRegistry {
 
   private static final Map<String, FullHttpResponse> cache = new HashMap<>();
 
+  private NexusStaticResponseRegistry() {
+  }
+
   public static void register(String key, Object body, int statusCode) {
     try {
       String json = DF_MAPPER.writeValueAsString(new Response.ApiResponse(statusCode, body));

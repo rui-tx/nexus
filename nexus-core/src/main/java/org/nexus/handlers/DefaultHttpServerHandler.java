@@ -18,11 +18,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.CompletionException;
-import org.nexus.GeneratedRoutes;
-import org.nexus.GeneratedRoutes.RouteMatch;
 import org.nexus.RequestContext;
 import org.nexus.Response;
 import org.nexus.Route;
+import org.nexus.RoutesResolver;
+import org.nexus.RoutesResolver.RouteMatch;
 import org.nexus.enums.ProblemDetailsTypes;
 import org.nexus.exceptions.ProblemDetailsException;
 import org.nexus.interfaces.Middleware;
@@ -61,7 +61,7 @@ public class DefaultHttpServerHandler extends SimpleChannelInboundHandler<HttpOb
             ? Map.of()
             : new QueryStringDecoder(rawUri, CharsetUtil.UTF_8).parameters();
 
-    RouteMatch match = GeneratedRoutes.findMatchingRoute(method, path);
+    RouteMatch match = RoutesResolver.findMatchingRoute(method, path);
     if (match == null) {
       sendResponse(ctx, new Response<>(404, "Not Found"), keepAlive);
       return;

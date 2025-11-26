@@ -1,7 +1,11 @@
 package org.nexus.annotations.processor;
 
+import static org.nexus.annotations.processor.MappingProcessorConstants.SPACER;
+
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +25,9 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic.Kind;
+import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
+import javax.tools.StandardLocation;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.RequestBody;
 import org.nexus.annotations.RequestContextParam;
@@ -29,8 +35,6 @@ import org.nexus.annotations.RequestContextParam;
 @SupportedAnnotationTypes("org.nexus.annotations.Mapping")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
 public final class MappingProcessor extends AbstractProcessor {
-
-  private final String spacer = "  ";
 
   private Filer filer;
   private Messager messager;
@@ -53,7 +57,19 @@ public final class MappingProcessor extends AbstractProcessor {
 
     Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(Mapping.class);
     if (annotatedElements.isEmpty()) {
-      return false;
+      try {
+        // Generate an empty routes file so runtime can rely on its presence
+        generateRoutesFile(List.of());
+        writeServiceProvider();
+        // Write (possibly empty) reflection config so native builds remain consistent
+        reflectionConfigGenerator.writeConfig();
+        hasGenerated = true;
+        messager.printMessage(Kind.NOTE, "No @Mapping found. Generated default GeneratedRoutes.");
+        return true;
+      } catch (Exception e) {
+        messager.printMessage(Kind.ERROR, "Failed to generate default routes: " + e.getMessage());
+        return false;
+      }
     }
 
     try {
@@ -62,12 +78,12 @@ public final class MappingProcessor extends AbstractProcessor {
       return true;
     } catch (Exception e) {
       messager.printMessage(Kind.ERROR, "Failed to generate routes: " + e.getMessage());
-      e.printStackTrace();
+      messager.printMessage(Kind.ERROR, "Trace: " + Arrays.toString(e.getStackTrace()));
       return false;
     }
   }
 
-  private void validateAndGenerateRoutes(Set<? extends Element> elements) throws Exception {
+  private void validateAndGenerateRoutes(Set<? extends Element> elements) throws IOException {
     Map<String, String> routeKeys = new HashMap<>();
     List<RouteInfo> routes = new ArrayList<>();
 
@@ -109,6 +125,7 @@ public final class MappingProcessor extends AbstractProcessor {
 
     // Second pass: generate code
     generateRoutesFile(routes);
+    writeServiceProvider();
 
     // Third pass: generate reflection config
     reflectionConfigGenerator.writeConfig();
@@ -140,7 +157,7 @@ public final class MappingProcessor extends AbstractProcessor {
             " for method " + method.getSimpleName());
   }
 
-  private void generateRoutesFile(List<RouteInfo> routes) throws Exception {
+  private void generateRoutesFile(List<RouteInfo> routes) throws IOException {
     StringBuilder builder = new StringBuilder();
     builder.append(MappingProcessorConstants.GENERATED_CLASS_HEADER)
         .append(MappingProcessorConstants.HELPER_METHODS)
@@ -148,7 +165,7 @@ public final class MappingProcessor extends AbstractProcessor {
 
     // Add route mappings
     for (RouteInfo route : routes) {
-      builder.append(spacer.repeat(2)).append(generateRouteMapping(route)).append("\n");
+      builder.append(SPACER.repeat(2)).append(generateRouteMapping(route)).append("\n");
     }
 
     builder.append("  }")
@@ -176,7 +193,7 @@ public final class MappingProcessor extends AbstractProcessor {
         continue;
       }
 
-      paramProcessor.processParameter(parameters.get(i), i);
+      paramProcessor.processParameter(parameters.get(i));
     }
 
     String paramCode = paramProcessor.getParamCode();
@@ -185,24 +202,21 @@ public final class MappingProcessor extends AbstractProcessor {
 
     boolean isExact = placeholders.isEmpty();
 
-    StringBuilder sb1 = new StringBuilder();
-    sb1.append("new Route<%s>(%s, \"%s\", rc -> {\n")
-        .append(spacer.repeat(7))
-        .append(paramCode.isEmpty() ? "" : paramCode)
-        .append("%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n")
-        .append(spacer.repeat(7))
-        .append("try {\n")
-        .append(spacer.repeat(8))
-        .append("return controller.%s(%s);\n")
-        .append(spacer.repeat(7))
-        .append("} catch (Exception e) {\n")
-        .append(spacer.repeat(8))
-        .append("return CompletableFuture.failedFuture(e); }})");
-
-    ;
+    String sb1 = "new Route<%s>(%s, \"%s\", rc -> {\n"
+        + SPACER.repeat(7)
+        + (paramCode.isEmpty() ? "" : paramCode)
+        + "%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n"
+        + SPACER.repeat(7)
+        + "try {\n"
+        + SPACER.repeat(8)
+        + "return controller.%s(%s);\n"
+        + SPACER.repeat(7)
+        + "} catch (Exception e) {\n"
+        + SPACER.repeat(8)
+        + "return CompletableFuture.failedFuture(e); }})";
 
     String routeCreation = String.format(
-        sb1.toString(),
+        sb1,
         responseType, httpMethod, endpoint,
         "", className,  // paramCode (handled above), className
         className, methodName, invokeArgs
@@ -211,28 +225,26 @@ public final class MappingProcessor extends AbstractProcessor {
     if (isExact) {
       // Exact route: Use normalized key for put
       return String.format(
-          "exactRoutes.put(\"%s \" + PathMatcher.normalise(\"%s\"), %s);\n",
+          "exactRoutes.put(\"%s \" + PathMatcher.normalise(\"%s\"), %s);%n",
           methodStr, endpoint, routeCreation
       );
     } else {
       // Dynamic route: Precompile and add to list
 
-      StringBuilder sb2 = new StringBuilder();
-      sb2.append("dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>())")
-          .append("\n")
-          .append(spacer.repeat(4))
-          .append(".add(new CompiledRoute(CompiledPattern.compile(\"%s\"),")
-          .append("\n")
-          .append(spacer.repeat(6))
-          .append("%s));\n")
-      ;
+      String sb2 = "dynamicRoutesByMethod.computeIfAbsent(\"%s\", k -> new ArrayList<>())"
+          + "\n"
+          + SPACER.repeat(4)
+          + ".add(new CompiledRoute(CompiledPattern.compile(\"%s\"),"
+          + "\n"
+          + SPACER.repeat(6)
+          + "%s));\n";
 
-      return String.format(sb2.toString(), methodStr, endpoint, routeCreation
+      return String.format(sb2, methodStr, endpoint, routeCreation
       );
     }
   }
 
-  private void writeGeneratedFile(String content) throws Exception {
+  private void writeGeneratedFile(String content) throws IOException {
     JavaFileObject sourceFile = filer.createSourceFile(
         MappingProcessorConstants.GENERATED_PACKAGE_FILE);
     try (PrintWriter writer = new PrintWriter(sourceFile.openWriter())) {
@@ -241,6 +253,19 @@ public final class MappingProcessor extends AbstractProcessor {
     messager.printMessage(
         Kind.NOTE,
         MappingProcessorConstants.GENERATED_FILE_NAME + ".java created successfully");
+  }
+
+  /**
+   * Writes the ServiceLoader provider configuration so core can load the generated class without
+   * reflection.
+   */
+  private void writeServiceProvider() throws IOException {
+    String servicePath = "META-INF/services/org.nexus.RoutesResolver$RoutesProvider";
+    FileObject fo = filer.createResource(StandardLocation.CLASS_OUTPUT, "", servicePath);
+    try (PrintWriter w = new PrintWriter(fo.openWriter())) {
+      w.println(MappingProcessorConstants.GENERATED_PACKAGE_FILE);
+    }
+    messager.printMessage(Kind.NOTE, "Service provider written: " + servicePath);
   }
 
   private record RouteInfo(ExecutableElement method, Mapping mapping) {

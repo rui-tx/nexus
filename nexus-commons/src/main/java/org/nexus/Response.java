@@ -77,11 +77,16 @@ public class Response<T> {
           """.formatted(statusCode);
     }
 
-    String contentType = isProblem
-        ? "application/problem+json"
-        : responseType == ResponseType.JSON
-            ? "application/json"
-            : "text/plain";
+    String contentType;
+    if (isProblem) {
+      contentType = "application/problem+json";
+    } else {
+      if (responseType == ResponseType.JSON) {
+        contentType = "application/json";
+      } else {
+        contentType = "text/plain";
+      }
+    }
 
     DefaultFullHttpResponse response = new DefaultFullHttpResponse(
         HttpVersion.HTTP_1_1,
