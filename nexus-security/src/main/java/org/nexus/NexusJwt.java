@@ -8,8 +8,8 @@ import org.slf4j.LoggerFactory;
 public final class NexusJwt {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(NexusJwt.class);
-  private static volatile NexusConfig config;
-  private static volatile boolean initialized = false;
+  private static NexusConfig config;
+  private static boolean initialized = false;
 
   private NexusJwt() {
   }
@@ -26,12 +26,12 @@ public final class NexusJwt {
     LOGGER.info("NexusJwt initialized");
   }
 
-  public static JwtService getJwtService() {
+  public static synchronized JwtService getJwtService() {
     checkInitialized();
     return InstanceHolder.jwtService;
   }
 
-  public static JwtConfig getJwtConfig() {
+  public static synchronized JwtConfig getJwtConfig() {
     checkInitialized();
     return InstanceHolder.jwtConfig;
   }

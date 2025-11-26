@@ -16,7 +16,7 @@
       <module>nexus-commons</module>
       <module>nexus-annotations</module>
       <module>nexus-core</module>
-      <module>nexus-security-jwt</module>
+      <module>nexus-security</module>
       <module>nexus-database</module>
       <module>nexus-starter</module>
       <module>nexus-coverage-report</module>

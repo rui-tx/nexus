@@ -45,7 +45,7 @@
 
       <dependency>
         <groupId>org.nexus</groupId>
-        <artifactId>nexus-security-jwt</artifactId>
+        <artifactId>nexus-security</artifactId>
       </dependency>
 
       <dependency>

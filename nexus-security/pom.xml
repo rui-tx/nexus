@@ -10,7 +10,7 @@
     <version>0.1-ALPHA-SNAPSHOT</version>
   </parent>
 
-  <artifactId>nexus-security-jwt</artifactId>
+  <artifactId>nexus-security</artifactId>
   <packaging>jar</packaging>
   <name>Nexus Security - JWT</name>
 
