@@ -1,7 +1,7 @@
 package org.nexus.enums;
 
 /**
- * Supported database types.
+ * Supported database domain.
  */
 public enum DatabaseType {
   SQLITE,

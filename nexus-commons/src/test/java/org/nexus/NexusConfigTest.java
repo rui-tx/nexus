@@ -18,7 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.nexus.config.db.DatabaseConfig;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.enums.DatabaseType;
 
 @DisplayName("NexusConfig Tests")

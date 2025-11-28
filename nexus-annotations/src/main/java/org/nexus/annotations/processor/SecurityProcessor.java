@@ -16,9 +16,9 @@ import javax.tools.Diagnostic;
 import javax.tools.FileObject;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
-import org.nexus.SecurityRule;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.Secured;
+import org.nexus.domain.SecurityRule;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Secured")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
@@ -161,7 +161,7 @@ public final class SecurityProcessor extends AbstractProcessor {
           import org.nexus.PathMatcher;
           import org.nexus.PathMatcher.CompiledPattern;
           import org.nexus.PathMatcher.Result;
-          import org.nexus.SecurityRule;
+          import org.nexus.domain.SecurityRule;
           import org.nexus.SecurityResolver;
           
           public final class %s implements SecurityResolver.SecurityRulesProvider {

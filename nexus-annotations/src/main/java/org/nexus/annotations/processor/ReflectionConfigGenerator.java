@@ -24,7 +24,7 @@ import javax.tools.FileObject;
 import javax.tools.StandardLocation;
 
 /**
- * Generates GraalVM reflect-config.json for types used in @RequestBody parameters.
+ * Generates GraalVM reflect-config.json for domain used in @RequestBody parameters.
  */
 final class ReflectionConfigGenerator {
 
@@ -56,7 +56,7 @@ final class ReflectionConfigGenerator {
       return;
     }
 
-    // Skip primitive types and common Java types that don't need reflection
+    // Skip primitive domain and common Java domain that don't need reflection
     if (isPrimitiveOrBoxed(typeName) || isCommonJavaType(typeName)) {
       return;
     }
@@ -75,7 +75,7 @@ final class ReflectionConfigGenerator {
     messager.printMessage(Kind.WARNING,
         "Adding reflection config for: %s".formatted(typeName));
 
-    // Process nested types (fields of this type)
+    // Process nested domain (fields of this type)
     processNestedTypes(typeElement);
   }
 
@@ -94,14 +94,14 @@ final class ReflectionConfigGenerator {
   }
 
   /**
-   * Recursively processes fields of a type to find nested types.
+   * Recursively processes fields of a type to find nested domain.
    */
   private void processNestedTypes(TypeElement typeElement) {
     for (Element enclosed : typeElement.getEnclosedElements()) {
       if (enclosed.getKind() == ElementKind.FIELD) {
         TypeMirror fieldType = enclosed.asType();
 
-        // Handle generic types (e.g., List<String>)
+        // Handle generic domain (e.g., List<String>)
         if (fieldType instanceof DeclaredType declaredType) {
 
           // Process the container type (e.g., List)
@@ -152,11 +152,11 @@ final class ReflectionConfigGenerator {
           }
         }
       } else {
-        // Process non-Future return types directly
+        // Process non-Future return domain directly
         processTypeRecursively(returnType);
       }
     } else {
-      // Process non-declared types (primitives, arrays, etc.)
+      // Process non-declared domain (primitives, arrays, etc.)
       processTypeRecursively(returnType);
     }
   }
@@ -177,7 +177,7 @@ final class ReflectionConfigGenerator {
       return;
     }
 
-    // Only process declared types (classes, interfaces)
+    // Only process declared domain (classes, interfaces)
     if (type.getKind() != TypeKind.DECLARED) {
       return;
     }
@@ -196,12 +196,12 @@ final class ReflectionConfigGenerator {
         ", Binary: " + binaryName +
         ", Kind: " + typeElement.getKind());
 
-    // Skip already processed types
+    // Skip already processed domain
     if (processedTypes.contains(binaryName)) {
       return;
     }
 
-    // Skip primitives and common Java types (but still process their type arguments)
+    // Skip primitives and common Java domain (but still process their type arguments)
     boolean skipAdding = isPrimitiveOrBoxed(typeName) || isCommonJavaType(typeName);
     if (!skipAdding) {
       messager.printMessage(Kind.NOTE, "Adding type to reflection config: " + binaryName);
@@ -211,11 +211,11 @@ final class ReflectionConfigGenerator {
       entries.add(entry);
       processedTypes.add(binaryName);
 
-      // Process nested types (fields, etc.)
+      // Process nested domain (fields, etc.)
       processNestedTypes(typeElement);
     }
 
-    // ALWAYS process type arguments, even for common types like List
+    // ALWAYS process type arguments, even for common domain like List
     for (TypeMirror typeArg : declaredType.getTypeArguments()) {
       // Special handling for type arguments in nested classes
       if (typeArg.toString().contains(".") && !typeArg.toString().startsWith("java.")) {
@@ -281,7 +281,7 @@ final class ReflectionConfigGenerator {
   void writeConfig() throws IOException {
     if (entries.isEmpty()) {
       messager.printMessage(Kind.NOTE,
-          "No types requiring reflection config found");
+          "No domain requiring reflection config found");
 
       FileObject resource = filer.createResource(
           StandardLocation.CLASS_OUTPUT,

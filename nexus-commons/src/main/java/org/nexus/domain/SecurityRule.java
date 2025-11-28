@@ -1,4 +1,4 @@
-package org.nexus;
+package org.nexus.domain;
 
 import java.util.Set;
 

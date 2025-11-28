@@ -106,9 +106,9 @@ final class MappingParameterProcessor {
     String paramType = param.asType().toString();
     String paramName = param.getSimpleName().toString();
 
-    // For generic types, we need to use TypeReference to properly handle type erasure
+    // For generic domain, we need to use TypeReference to properly handle type erasure
     if (paramType.contains("<")) {
-      // For generic types, use TypeReference
+      // For generic domain, use TypeReference
       String typeRef = "new com.fasterxml.jackson.core.type.TypeReference<" + paramType + ">() {}";
       paramCode
           .append(paramType).append(" ").append(paramName).append(";")
@@ -116,7 +116,7 @@ final class MappingParameterProcessor {
           .append(paramName)
           .append(" = DF_MAPPER.readValue(rc.getBody(), ").append(typeRef).append(");");
     } else {
-      // For non-generic types, we can use .class
+      // For non-generic domain, we can use .class
       paramCode
           .append(paramType).append(" ").append(paramName).append(";")
           .append(" try {")

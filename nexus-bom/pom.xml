@@ -73,6 +73,12 @@
 
       <dependency>
         <groupId>org.nexus</groupId>
+        <artifactId>nexus-queue</artifactId>
+        <version>${revision}</version>
+      </dependency>
+
+      <dependency>
+        <groupId>org.nexus</groupId>
         <artifactId>nexus-starter</artifactId>
         <version>${revision}</version>
       </dependency>

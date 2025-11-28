@@ -185,7 +185,7 @@ class NexusDatabaseRegistryTest {
     // Note: This is difficult to test without mocking since DatabaseType is an enum
     // and NexusConfig validates the type. The registry would need a way to inject
     // an invalid type, which isn't possible without mocks.
-    // This test confirms that valid types work correctly.
+    // This test confirms that valid domain work correctly.
     assertDoesNotThrow(NexusDatabaseRegistry::new);
   }
 

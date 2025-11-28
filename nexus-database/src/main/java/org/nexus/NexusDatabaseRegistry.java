@@ -5,7 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import org.nexus.config.db.DatabaseConfig;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.dbconnector.PostgresConnector;
 import org.nexus.dbconnector.SqliteConnector;
 import org.nexus.enums.DatabaseType;

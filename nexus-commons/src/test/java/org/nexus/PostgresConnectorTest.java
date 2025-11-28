@@ -10,7 +10,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import org.junit.jupiter.api.Test;
-import org.nexus.config.db.DatabaseConfig;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.dbconnector.PostgresConnector;
 import org.nexus.enums.DatabaseType;
 import org.nexus.exceptions.DatabaseException;

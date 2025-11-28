@@ -3,6 +3,7 @@ package org.nexus.config.jwt;
 import com.nimbusds.jose.jwk.OctetSequenceKey;
 import java.time.Duration;
 import org.nexus.NexusConfig;
+import org.nexus.domain.JwtSecrets;
 
 public class JwtConfig {
 

@@ -1,6 +1,7 @@
 package org.nexus;
 
 import java.util.ServiceLoader;
+import org.nexus.domain.SecurityRule;
 
 /**
  * Resolves the SecurityRulesProvider at runtime via ServiceLoader. No compile-time dependency on

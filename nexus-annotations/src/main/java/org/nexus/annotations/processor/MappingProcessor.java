@@ -87,7 +87,7 @@ public final class MappingProcessor extends AbstractProcessor {
     Map<String, String> routeKeys = new HashMap<>();
     List<RouteInfo> routes = new ArrayList<>();
 
-    // First pass: validate all methods and collect route information plus reflection types
+    // First pass: validate all methods and collect route information plus reflection domain
     for (Element element : elements) {
       if (element.getKind() != ElementKind.METHOD) {
         messager.printMessage(
@@ -117,7 +117,7 @@ public final class MappingProcessor extends AbstractProcessor {
       // Validate return type
       MappingProcessorUtils.validateMethodReturnType(method, messager);
 
-      // Collect @RequestBody types for reflection config
+      // Collect @RequestBody domain for reflection config
       collectReflectionTypes(method);
 
       routes.add(new RouteInfo(method, mapping));
@@ -132,7 +132,7 @@ public final class MappingProcessor extends AbstractProcessor {
   }
 
   /**
-   * Collects all types that need reflection configuration.
+   * Collects all domain that need reflection configuration.
    */
   private void collectReflectionTypes(ExecutableElement method) {
     // Process method parameters with @RequestBody

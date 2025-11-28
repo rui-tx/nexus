@@ -65,10 +65,17 @@
       <scope>test</scope>
     </dependency>
 
-    <!-- Test scope needs annotation types and DI annotations -->
+    <!-- Test scope needs annotation domain and DI annotations -->
     <dependency>
       <groupId>org.nexus</groupId>
       <artifactId>nexus-annotations</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- for testing -->
+    <dependency>
+      <groupId>org.nexus</groupId>
+      <artifactId>nexus-queue</artifactId>
       <scope>test</scope>
     </dependency>
 

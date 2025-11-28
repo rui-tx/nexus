@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
-import org.nexus.config.db.DatabaseConfig;
+import org.nexus.config.DatabaseConfig;
 import org.nexus.dbconnector.DatabaseConnectorFactory;
 import org.nexus.dbconnector.SqliteConnector;
 import org.nexus.exceptions.DatabaseException;
