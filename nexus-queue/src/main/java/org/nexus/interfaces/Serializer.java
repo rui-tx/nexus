@@ -6,5 +6,5 @@ package org.nexus.interfaces;
 @FunctionalInterface
 public interface Serializer<T> {
 
-  byte[] serialize(String topic, T data);
+  byte[] serialize(String category, T data);
 }

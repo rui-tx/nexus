@@ -2,201 +2,166 @@ package org.nexus;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import org.nexus.domain.ConsumerConfig;
 
-/**
- * Manages a group of consumers for a topic. Handles partition assignment and offset tracking.
- */
 public class ConsumerGroup {
 
+  private static final long REBALANCE_DEBOUNCE_MS = 1000L;
   private final String groupId;
-  private final String topic;
-
-  // Active consumers in this group
+  private final String category;
   private final Map<String, ConsumerRegistration> consumers = new ConcurrentHashMap<>();
-
-  // Partition assignments: consumerId -> List<partitionId>
   private final Map<String, List<Integer>> assignments = new ConcurrentHashMap<>();
-
-  // Offset tracking: partitionId -> committed offset
   private final Map<Integer, Long> committedOffsets = new ConcurrentHashMap<>();
-
-  // For coordinating rebalancing
   private final ReadWriteLock rebalanceLock = new ReentrantReadWriteLock();
+  private final ScheduledExecutorService rebalanceScheduler;
+  private volatile ScheduledFuture<?> pendingRebalance = null;
 
-  public ConsumerGroup(String groupId, String topic) {
+  public ConsumerGroup(String groupId, String category) {
     this.groupId = groupId;
-    this.topic = topic;
+    this.category = category;
+    this.rebalanceScheduler =
+        Executors.newSingleThreadScheduledExecutor(r -> {
+          Thread t = new Thread(r, "cg-rebalance");
+          t.setDaemon(true);
+          return t;
+        });
   }
 
-  /**
-   * Register a new consumer
-   */
-  public void registerConsumer(String consumerId, ConsumerConfig config, int totalPartitions) {
+  public void registerConsumer(String consumerId, ConsumerConfig config, int totalQueues) {
     rebalanceLock.writeLock().lock();
     try {
-      ConsumerRegistration registration = new ConsumerRegistration(
-          consumerId,
-          config,
-          System.currentTimeMillis()
-      );
-
-      consumers.put(consumerId, registration);
-
-      // Trigger rebalance
-      rebalance(totalPartitions);
-
+      consumers.put(consumerId,
+          new ConsumerRegistration(consumerId, config, System.currentTimeMillis()));
     } finally {
       rebalanceLock.writeLock().unlock();
     }
+    scheduleRebalance(totalQueues);
   }
 
-  /**
-   * Unregister a consumer
-   */
-  public void unregisterConsumer(String consumerId, int totalPartitions) {
+  public void unregisterConsumer(String consumerId, int totalQueues) {
     rebalanceLock.writeLock().lock();
     try {
       consumers.remove(consumerId);
       assignments.remove(consumerId);
+    } finally {
+      rebalanceLock.writeLock().unlock();
+    }
+    if (!consumers.isEmpty()) {
+      scheduleRebalance(totalQueues);
+    }
+  }
 
-      // Trigger rebalance to reassign partitions
-      if (!consumers.isEmpty()) {
-        rebalance(totalPartitions);
+  private void scheduleRebalance(int totalQueues) {
+    if (pendingRebalance != null && !pendingRebalance.isDone()) {
+      pendingRebalance.cancel(false);
+    }
+    pendingRebalance = rebalanceScheduler.schedule(
+        () -> rebalance(totalQueues),
+        REBALANCE_DEBOUNCE_MS,
+        TimeUnit.MILLISECONDS
+    );
+  }
+
+  private void rebalance(int totalQueues) {
+    rebalanceLock.writeLock().lock();
+    try {
+      assignments.clear();
+
+      if (consumers.isEmpty()) {
+        return;
       }
+
+      List<String> consumerIds = new ArrayList<>(consumers.keySet());
+      Collections.sort(consumerIds); // deterministic order
+
+      for (int queue = 0; queue < totalQueues; queue++) {
+        String consumer = consumerIds.get(queue % consumerIds.size());
+        assignments.computeIfAbsent(consumer, _ -> new ArrayList<>()).add(queue);
+      }
+
+      System.out.println("Rebalanced category '" + category + "' for group '" + groupId + "':");
+      assignments.forEach((c, queues) ->
+          System.out.println("  " + c + " -> queues " + queues));
 
     } finally {
       rebalanceLock.writeLock().unlock();
     }
   }
 
-  /**
-   * Rebalance partitions among consumers Strategy: Simple round-robin assignment
-   */
-  private void rebalance(int totalPartitions) {
-    // Clear existing assignments
-    assignments.clear();
-
-    if (consumers.isEmpty()) {
-      return;
-    }
-
-    // Get sorted list of consumer IDs for consistent assignment
-    List<String> consumerIds = new ArrayList<>(consumers.keySet());
-    Collections.sort(consumerIds);
-
-    // Assign partitions round-robin
-    for (int partition = 0; partition < totalPartitions; partition++) {
-      String consumerId = consumerIds.get(partition % consumerIds.size());
-      assignments.computeIfAbsent(consumerId, k -> new ArrayList<>())
-          .add(partition);
-    }
-
-    System.out.println("Rebalanced topic '" + topic + "' for group '" + groupId + "':");
-    for (Map.Entry<String, List<Integer>> entry : assignments.entrySet()) {
-      System.out.println("  " + entry.getKey() + " -> partitions " + entry.getValue());
-    }
-  }
-
-  /**
-   * Get partitions assigned to a consumer
-   */
-  public List<Integer> getAssignedPartitions(String consumerId) {
-    rebalanceLock.readLock().lock();
-    try {
-      return assignments.getOrDefault(consumerId, Collections.emptyList());
-    } finally {
-      rebalanceLock.readLock().unlock();
-    }
-  }
-
-  /**
-   * Commit an offset for a partition
-   */
-  public void commitOffset(int partition, long offset) {
-    committedOffsets.put(partition, offset);
-  }
-
-  /**
-   * Get the committed offset for a partition
-   */
-  public long getCommittedOffset(int partition) {
-    return committedOffsets.getOrDefault(partition, 0L);
-  }
-
-  /**
-   * Get all committed offsets
-   */
-  public Map<Integer, Long> getAllCommittedOffsets() {
-    return new HashMap<>(committedOffsets);
-  }
-
-  /**
-   * Check if consumer is registered
-   */
-  public boolean hasConsumer(String consumerId) {
-    return consumers.containsKey(consumerId);
-  }
-
-  /**
-   * Get consumer count
-   */
-  public int getConsumerCount() {
-    return consumers.size();
-  }
-
-  /**
-   * Update consumer heartbeat
-   */
-  public void heartbeat(String consumerId) {
-    ConsumerRegistration registration = consumers.get(consumerId);
-    if (registration != null) {
-      registration.updateHeartbeat();
-    }
-  }
-
-  /**
-   * Remove inactive consumers (heartbeat timeout)
-   */
-  public void removeInactiveConsumers(long timeoutMs, int totalPartitions) {
+  public void removeInactiveConsumers(long timeoutMs, int totalQueues) {
     rebalanceLock.writeLock().lock();
     try {
       long now = System.currentTimeMillis();
       List<String> toRemove = new ArrayList<>();
 
-      for (Map.Entry<String, ConsumerRegistration> entry : consumers.entrySet()) {
-        if (now - entry.getValue().getLastHeartbeat() > timeoutMs) {
-          toRemove.add(entry.getKey());
+      for (ConsumerRegistration reg : consumers.values()) {
+        if (now - reg.getLastHeartbeat() > timeoutMs) {
+          toRemove.add(reg.getConsumerId());
         }
       }
 
       if (!toRemove.isEmpty()) {
-        for (String consumerId : toRemove) {
-          System.out.println("Removing inactive consumer: " + consumerId);
-          consumers.remove(consumerId);
-          assignments.remove(consumerId);
+        for (String id : toRemove) {
+          System.out.println("Removing inactive consumer: " + id);
+          consumers.remove(id);
+          assignments.remove(id);
         }
-
-        // Rebalance if we removed consumers
-        rebalance(totalPartitions);
+        // rebalance only after all removals
+        if (!consumers.isEmpty()) {
+          scheduleRebalance(totalQueues);
+        }
       }
-
     } finally {
       rebalanceLock.writeLock().unlock();
     }
   }
 
-  public String getGroupId() {
-    return groupId;
+  // heartbeat just updates timestamp – no rebalance
+  public void heartbeat(String consumerId) {
+    ConsumerRegistration reg = consumers.get(consumerId);
+    if (reg != null) {
+      reg.updateHeartbeat();
+    }
   }
 
-  public String getTopic() {
-    return topic;
+  // unchanged methods below
+  public List<Integer> getAssignedQueues(String consumerId) {
+    rebalanceLock.readLock().lock();
+    try {
+      return List.copyOf(assignments.getOrDefault(consumerId, Collections.emptyList()));
+    } finally {
+      rebalanceLock.readLock().unlock();
+    }
+  }
+
+  public void commitOffset(int partition, long offset) {
+    committedOffsets.put(partition, offset);
+  }
+
+  public long getCommittedOffset(int partition) {
+    return committedOffsets.getOrDefault(partition, 0L);
+  }
+
+  public Map<Integer, Long> getAllCommittedOffsets() {
+    return Map.copyOf(committedOffsets);
+  }
+
+  public int getConsumerCount() {
+    return consumers.size();
+  }
+
+  public void shutdown() {
+    if (rebalanceScheduler != null) {
+      rebalanceScheduler.shutdownNow();
+    }
   }
 }

@@ -3,7 +3,7 @@ package org.nexus;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Tracks metrics for a topic
+ * Tracks metrics for a category
  */
 public class MetricsTracker {
 

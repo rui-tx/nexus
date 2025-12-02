@@ -10,7 +10,7 @@ import org.nexus.domain.PublishResult;
 public interface MessageProducer<T> {
 
   /**
-   * Send a message to a topic
+   * Send a message to a category
    */
   CompletableFuture<PublishResult> send(String topic, T payload);
 

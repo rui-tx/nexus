@@ -3,15 +3,12 @@ package org.nexus.domain;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Metadata about a message
- */
 public record MessageMetadata(
     MessageId id,
-    String topic,
+    String category,
     String key,
     Instant timestamp,
-    int partition,
+    int queue,
     long offset,
     Map<String, String> headers
 ) {
@@ -20,8 +17,8 @@ public record MessageMetadata(
     if (id == null) {
       throw new IllegalArgumentException("id cannot be null");
     }
-    if (topic == null || topic.isEmpty()) {
-      throw new IllegalArgumentException("topic cannot be null or empty");
+    if (category == null || category.isEmpty()) {
+      throw new IllegalArgumentException("category cannot be null or empty");
     }
   }
 

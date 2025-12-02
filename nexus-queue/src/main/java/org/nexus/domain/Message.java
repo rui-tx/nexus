@@ -2,9 +2,6 @@ package org.nexus.domain;
 
 import java.time.Instant;
 
-/**
- * A message in the queue system
- */
 public record Message<T>(
     MessageMetadata metadata,
     T payload
@@ -24,7 +21,7 @@ public record Message<T>(
   }
 
   public String topic() {
-    return metadata.topic();
+    return metadata.category();
   }
 
   public String key() {

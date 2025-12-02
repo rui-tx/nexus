@@ -1,11 +1,9 @@
 package org.nexus.embedded;
 
-import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.nexus.domain.MessageId;
-import org.nexus.domain.MessageMetadata;
+import org.nexus.domain.MessageInput;
 import org.nexus.domain.ProducerConfig;
 import org.nexus.domain.PublishResult;
 import org.nexus.interfaces.MessageProducer;
@@ -33,18 +31,18 @@ public class EmbeddedProducer<T> implements MessageProducer<T> {
   }
 
   @Override
-  public CompletableFuture<PublishResult> send(String topic, T payload) {
-    return send(topic, null, payload, Map.of());
+  public CompletableFuture<PublishResult> send(String category, T payload) {
+    return send(category, null, payload, Map.of());
   }
 
   @Override
-  public CompletableFuture<PublishResult> send(String topic, String key, T payload) {
-    return send(topic, key, payload, Map.of());
+  public CompletableFuture<PublishResult> send(String category, String key, T payload) {
+    return send(category, key, payload, Map.of());
   }
 
   @Override
   public CompletableFuture<PublishResult> send(
-      String topic,
+      String category,
       String key,
       T payload,
       Map<String, String> headers
@@ -58,24 +56,16 @@ public class EmbeddedProducer<T> implements MessageProducer<T> {
     return CompletableFuture.supplyAsync(() -> {
       try {
         // Serialize payload
-        byte[] payloadBytes = serializer.serialize(topic, payload);
+        byte[] payloadBytes = serializer.serialize(category, payload);
 
-        // Create metadata
-        MessageId messageId = MessageId.generate();
-        MessageMetadata metadata = new MessageMetadata(
-            messageId,
-            topic,
+        // Create
+        MessageInput input = new MessageInput(
+            category,
             key,
-            Instant.now(),
-            -1, // Will be set by topic
-            -1L, // Will be set by partition
             headers
         );
 
-        // Publish to broker
-        PublishResult result = broker.publish(topic, payloadBytes, metadata);
-
-        return result;
+        return broker.publish(category, payloadBytes, input);
 
       } catch (Exception e) {
         throw new RuntimeException("Failed to publish message", e);

@@ -3,7 +3,7 @@ package org.nexus.domain;
 import java.time.Instant;
 
 /**
- * A message stored in a partition with its offset
+ * A message stored in a queue with its offset
  */
 public record StoredMessage(
     long offset,

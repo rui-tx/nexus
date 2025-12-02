@@ -10,7 +10,7 @@ public record BrokerStats(
     long totalMessages,
     long totalBytes,
     int totalConsumers,
-    Map<String, TopicStats> topicStats
+    Map<String, CategoryStats> topicStats
 ) {
 
 }

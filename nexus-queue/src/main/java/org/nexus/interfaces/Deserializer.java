@@ -6,5 +6,5 @@ package org.nexus.interfaces;
 @FunctionalInterface
 public interface Deserializer<T> {
 
-  T deserialize(String topic, byte[] data);
+  T deserialize(String category, byte[] data);
 }

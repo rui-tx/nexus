@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 public interface MessageConsumer<T> {
 
   /**
-   * Subscribe to a topic with a handler
+   * Subscribe to a category with a handler
    */
   void subscribe(String topic, MessageHandler<T> handler);
 
@@ -18,7 +18,7 @@ public interface MessageConsumer<T> {
   void subscribe(String[] topics, MessageHandler<T> handler);
 
   /**
-   * Unsubscribe from a topic
+   * Unsubscribe from a category
    */
   void unsubscribe(String topic);
 

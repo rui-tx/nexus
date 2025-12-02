@@ -1,6 +1,7 @@
 package org.nexus.embedded;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -29,7 +30,7 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   // Subscriptions
   private final Map<String, MessageHandler<T>> subscriptions = new ConcurrentHashMap<>();
 
-  // Offset tracking per partition
+  // Offset tracking per queue
   private final Map<String, Map<Integer, Long>> offsets = new ConcurrentHashMap<>();
 
   // Polling control
@@ -53,14 +54,14 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
     this.config = config;
     this.deserializer = deserializer;
 
-    // Create polling thread
+    // Create a polling thread
     this.pollExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "consumer-poll-" + config.clientId());
       t.setDaemon(true);
       return t;
     });
 
-    // Create handler thread pool
+    // Create a handler thread pool
     this.handlerExecutor = Executors.newFixedThreadPool(
         Math.max(2, Runtime.getRuntime().availableProcessors()),
         r -> {
@@ -91,18 +92,18 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   }
 
   @Override
-  public void subscribe(String topic, MessageHandler<T> handler) {
-    subscribe(new String[]{topic}, handler);
+  public void subscribe(String category, MessageHandler<T> handler) {
+    subscribe(new String[]{category}, handler);
   }
 
   @Override
-  public void subscribe(String[] topics, MessageHandler<T> handler) {
-    for (String topic : topics) {
-      subscriptions.put(topic, handler);
-      offsets.putIfAbsent(topic, new ConcurrentHashMap<>());
+  public void subscribe(String[] categories, MessageHandler<T> handler) {
+    for (String category : categories) {
+      subscriptions.put(category, handler);
+      offsets.putIfAbsent(category, new ConcurrentHashMap<>());
 
       // Register with broker
-      broker.registerConsumer(config.consumerGroup(), config.clientId(), topic, config);
+      broker.registerConsumer(config.consumerGroup(), config.clientId(), category, config);
     }
 
     // Start polling if not already running
@@ -112,12 +113,12 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   }
 
   @Override
-  public void unsubscribe(String topic) {
-    subscriptions.remove(topic);
-    offsets.remove(topic);
+  public void unsubscribe(String category) {
+    subscriptions.remove(category);
+    offsets.remove(category);
 
     // Unregister from broker
-    broker.unregisterConsumer(config.consumerGroup(), config.clientId(), topic);
+    broker.unregisterConsumer(config.consumerGroup(), config.clientId(), category);
 
     // Stop polling if no more subscriptions
     if (subscriptions.isEmpty()) {
@@ -127,26 +128,14 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
   @Override
   public void unsubscribeAll() {
-    for (String topic : new ArrayList<>(subscriptions.keySet())) {
-      unsubscribe(topic);
+    for (String category : new ArrayList<>(subscriptions.keySet())) {
+      unsubscribe(category);
     }
   }
 
   @Override
   public CompletableFuture<Void> commitSync() {
-    return CompletableFuture.runAsync(() -> {
-      for (Map.Entry<String, Map<Integer, Long>> entry : offsets.entrySet()) {
-        String topic = entry.getKey();
-        for (Map.Entry<Integer, Long> partitionOffset : entry.getValue().entrySet()) {
-          broker.commitOffset(
-              config.consumerGroup(),
-              topic,
-              partitionOffset.getKey(),
-              partitionOffset.getValue()
-          );
-        }
-      }
-    });
+    return CompletableFuture.runAsync(this::autoCommit);
   }
 
   @Override
@@ -163,6 +152,8 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   public CompletableFuture<Void> close() {
     if (closed.compareAndSet(false, true)) {
       running.set(false);
+
+      // Stop accepting new messages
       unsubscribeAll();
 
       // Shutdown executors
@@ -173,6 +164,7 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
       }
 
       try {
+        // Wait for pending operations to complete
         pollExecutor.awaitTermination(5, TimeUnit.SECONDS);
         handlerExecutor.awaitTermination(5, TimeUnit.SECONDS);
         if (commitExecutor != null) {
@@ -180,9 +172,9 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        System.err.println("Interrupted during shutdown: " + e.getMessage());
       }
     }
-
     return CompletableFuture.completedFuture(null);
   }
 
@@ -208,18 +200,18 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
     try {
       for (Map.Entry<String, MessageHandler<T>> entry : subscriptions.entrySet()) {
-        String topic = entry.getKey();
+        String category = entry.getKey();
         MessageHandler<T> handler = entry.getValue();
 
-        // Get assigned partitions
-        List<Integer> partitions = broker.getAssignedPartitions(
+        // Get assigned queues
+        List<Integer> queues = broker.getAssignedQueues(
             config.consumerGroup(),
             config.clientId(),
-            topic
+            category
         );
 
-        for (int partition : partitions) {
-          pollPartition(topic, partition, handler);
+        for (int queue : queues) {
+          pollQueue(category, queue, handler);
         }
       }
     } catch (Exception e) {
@@ -229,17 +221,29 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   }
 
   /**
-   * Poll messages from a specific partition
+   * Poll messages from a specific queue
    */
-  private void pollPartition(String topic, int partition, MessageHandler<T> handler) {
-    // Get current offset for this partition
-    long currentOffset = offsets.get(topic)
-        .getOrDefault(partition, getCommittedOffset(topic, partition));
+  private void pollQueue(String category, int queue, MessageHandler<T> handler) {
+    // Initialize the topic in the offsets map if it doesn't exist
+    Map<Integer, Long> queueOffsets = offsets.computeIfAbsent(category,
+        _ -> new ConcurrentHashMap<>());
+
+    // Always get the committed offset from the broker
+    long currentOffset = getCommittedOffset(category, queue);
+
+    // If we have a newer offset locally, use that (but log a warning)
+    Long localOffset = queueOffsets.get(queue);
+    if (localOffset != null && localOffset > currentOffset) {
+      System.err.println("WARN: Local offset (" + localOffset +
+          ") is ahead of committed offset (" + currentOffset +
+          ") for " + category + "-" + queue);
+      currentOffset = localOffset;
+    }
 
     // Fetch messages
     List<StoredMessage> messages = broker.fetchMessages(
-        topic,
-        partition,
+        category,
+        queue,
         currentOffset,
         config.maxPollRecords()
     );
@@ -254,37 +258,35 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
         break;
       }
 
-      // Deserialize
-      T payload = deserializer.deserialize(topic, storedMessage.payload());
+      // Skip if we've already processed this message
+      if (storedMessage.offset() < currentOffset) {
+        continue;
+      }
 
-      // Create message
-      Message<T> message = new Message<>(
-          storedMessage.metadata(),
-          payload
-      );
+      // Deserialize and process
+      T payload = deserializer.deserialize(category, storedMessage.payload());
+      Message<T> message = new Message<>(storedMessage.metadata(), payload);
 
-      // Handle message asynchronously
-      CompletableFuture<Void> handleFuture = CompletableFuture
-          .runAsync(() -> {
-            try {
-              handler.handle(message).join();
-            } catch (Exception e) {
-              System.err.println("Error handling message: " + e.getMessage());
-              // TODO: Implement retry logic or DLQ
-            }
-          }, handlerExecutor);
-
-      // Wait for handler to complete (blocking for simplicity)
-      // In production, you'd want better flow control
       try {
-        handleFuture.get(30, TimeUnit.SECONDS);
+        // Process the message
+        handler.handle(message).get(30, TimeUnit.SECONDS);
 
-        // Update offset
-        offsets.get(topic).put(partition, storedMessage.offset() + 1);
+        // Update offset and commit
+        long newOffset = storedMessage.offset() + 1;
+        queueOffsets.put(queue, newOffset);
+
+        // synchronous for now. TODO: implement batching
+        broker.commitOffset(
+            config.consumerGroup(),
+            category,
+            queue,
+            newOffset
+        );
 
       } catch (Exception e) {
-        System.err.println("Handler timeout or error: " + e.getMessage());
-        break; // Stop processing this partition
+        System.err.println("Error handling message at offset " +
+            storedMessage.offset() + ": " + e.getMessage());
+        break;
       }
     }
   }
@@ -292,16 +294,35 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   /**
    * Get committed offset from broker
    */
-  private long getCommittedOffset(String topic, int partition) {
-    return broker.getCommittedOffset(config.consumerGroup(), topic, partition);
+  private long getCommittedOffset(String category, int queue) {
+    return broker.getCommittedOffset(config.consumerGroup(), category, queue);
   }
 
   /**
    * Auto-commit offsets
    */
   private void autoCommit() {
-    if (config.autoCommit() && !offsets.isEmpty()) {
-      commitSync().join();
+    if (!config.autoCommit() || offsets.isEmpty()) {
+      return;
+    }
+
+    // Make a copy of the current offsets to avoid concurrent modification
+    Map<String, Map<Integer, Long>> offsetsCopy = new HashMap<>();
+    for (Map.Entry<String, Map<Integer, Long>> entry : offsets.entrySet()) {
+      offsetsCopy.put(entry.getKey(), new HashMap<>(entry.getValue()));
+    }
+
+    // Commit all current offsets
+    for (Map.Entry<String, Map<Integer, Long>> topicEntry : offsetsCopy.entrySet()) {
+      String topic = topicEntry.getKey();
+      for (Map.Entry<Integer, Long> partitionEntry : topicEntry.getValue().entrySet()) {
+        broker.commitOffset(
+            config.consumerGroup(),
+            topic,
+            partitionEntry.getKey(),
+            partitionEntry.getValue()
+        );
+      }
     }
   }
 

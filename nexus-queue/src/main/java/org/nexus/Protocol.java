@@ -46,7 +46,7 @@ public class Protocol {
     // Calculate total size
     int size = HEADER_SIZE;
 
-    byte[] topicBytes = message.topic().getBytes(StandardCharsets.UTF_8);
+    byte[] topicBytes = message.category().getBytes(StandardCharsets.UTF_8);
     if (topicBytes.length > MAX_TOPIC_LENGTH) {
       throw new IllegalArgumentException("Topic too long: " + topicBytes.length);
     }

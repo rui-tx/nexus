@@ -1,9 +1,9 @@
 package org.nexus.interfaces;
 
 import java.util.concurrent.CompletableFuture;
+import org.nexus.domain.CategoryConfig;
 import org.nexus.domain.ConsumerConfig;
 import org.nexus.domain.ProducerConfig;
-import org.nexus.domain.TopicConfig;
 
 
 /**
@@ -17,7 +17,7 @@ public interface QueueBroker {
   <T> MessageProducer<T> createProducer(ProducerConfig config);
 
   /**
-   * Create a producer with default config
+   * Create a producer with a default config
    */
   default <T> MessageProducer<T> createProducer() {
     return createProducer(ProducerConfig.defaults());
@@ -29,28 +29,28 @@ public interface QueueBroker {
   <T> MessageConsumer<T> createConsumer(ConsumerConfig config);
 
   /**
-   * Create a consumer with default config
+   * Create a consumer with a default config
    */
   default <T> MessageConsumer<T> createConsumer(String consumerGroup) {
     return createConsumer(ConsumerConfig.defaults(consumerGroup));
   }
 
   /**
-   * Create or get a topic
+   * Create or get a category
    *
-   * @return the Topic interface
+   * @return the Category interface
    */
-  Topic getTopic(String name, TopicConfig config);
+  Category getOrCreateCategory(String name, CategoryConfig config);
 
   /**
-   * Delete a topic
+   * Delete a category
    */
-  CompletableFuture<Void> deleteTopic(String name);
+  CompletableFuture<Void> deleteCategory(String name);
 
   /**
-   * List all topics
+   * List all categories
    */
-  String[] listTopics();
+  String[] listCategories();
 
   /**
    * Shutdown the broker

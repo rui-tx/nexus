@@ -2,7 +2,7 @@ package org.nexus.services;
 
 import io.avaje.inject.Bean;
 import io.avaje.inject.Factory;
-import org.nexus.domain.TopicConfig;
+import org.nexus.domain.CategoryConfig;
 import org.nexus.embedded.EmbeddedQueueBroker;
 import org.nexus.interfaces.QueueBroker;
 
@@ -12,11 +12,11 @@ public class QueueConfiguration {
   @Bean
   public QueueBroker queueBroker() {
     QueueBroker broker = new EmbeddedQueueBroker();
-    broker.getTopic("pkg.created", new TopicConfig(8, 1, 86400000L, false));
+    broker.getOrCreateCategory("pkg.created", new CategoryConfig(8, 1, 86400000L, false));
     return broker;
   }
 
-  // Start 4 consumers (in same group, they'll share partitions)
+  // Start 4 consumers (in same group, they'll share queues)
 //  @Bean
 //  @Named("processor1")
 //  public QueueProcessor processor1(QueueBroker broker) {

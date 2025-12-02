@@ -1,10 +1,10 @@
 package org.nexus.domain;
 
 /**
- * Statistics about a partition
+ * Statistics about a queue
  */
-public record PartitionStats(
-    int partition,
+public record QueueStats(
+    int queue,
     long messageCount,
     long oldestOffset,
     long newestOffset,

@@ -1,7 +1,7 @@
 package org.nexus.exceptions;
 
 /**
- * Exception thrown when partition is full
+ * Exception thrown when queue is full
  */
 public class QueueFullException extends RuntimeException {
 

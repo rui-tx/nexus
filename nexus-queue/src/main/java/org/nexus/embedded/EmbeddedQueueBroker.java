@@ -11,50 +11,46 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.nexus.ConsumerGroup;
+import org.nexus.domain.AppendResult;
 import org.nexus.domain.BrokerStats;
+import org.nexus.domain.CategoryConfig;
+import org.nexus.domain.CategoryStats;
 import org.nexus.domain.ConsumerConfig;
-import org.nexus.domain.MessageMetadata;
+import org.nexus.domain.MessageInput;
 import org.nexus.domain.ProducerConfig;
 import org.nexus.domain.PublishResult;
 import org.nexus.domain.StoredMessage;
-import org.nexus.domain.TopicConfig;
-import org.nexus.domain.TopicStats;
-import org.nexus.impl.TopicImpl;
+import org.nexus.impl.CategoryImpl;
+import org.nexus.interfaces.Category;
 import org.nexus.interfaces.Deserializer;
 import org.nexus.interfaces.MessageConsumer;
 import org.nexus.interfaces.MessageProducer;
 import org.nexus.interfaces.QueueBroker;
 import org.nexus.interfaces.Serializer;
-import org.nexus.interfaces.Topic;
 import org.nexus.serialization.Deserializers;
 import org.nexus.serialization.Serializers;
 
 /**
- * Main embedded queue broker. Coordinates topics, consumer groups, and message routing.
+ * Main embedded queue broker. Coordinates categories, consumer groups, and message routing.
  */
 public class EmbeddedQueueBroker implements QueueBroker {
 
-  // Topics storage
-  private final Map<String, TopicImpl> topics = new ConcurrentHashMap<>();
+  private final Map<String, CategoryImpl> categories = new ConcurrentHashMap<>();
 
-  // Consumer groups: topicName -> groupId -> ConsumerGroup
+  // Consumer groups: categoryName -> groupId -> ConsumerGroup
   private final Map<String, Map<String, ConsumerGroup>> consumerGroups = new ConcurrentHashMap<>();
 
   // Background tasks
   private final ScheduledExecutorService maintenanceExecutor;
-
-  // Shutdown flag
   private volatile boolean shutdown = false;
 
   public EmbeddedQueueBroker() {
-    // Start maintenance tasks (cleanup, heartbeat checks, etc.)
     this.maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "broker-maintenance");
       t.setDaemon(true);
       return t;
     });
 
-    // Run maintenance every 30 seconds
     maintenanceExecutor.scheduleAtFixedRate(
         this::runMaintenance,
         30, 30, TimeUnit.SECONDS
@@ -68,7 +64,6 @@ public class EmbeddedQueueBroker implements QueueBroker {
     }
 
     // Use byte array serializer by default
-    // Users can wrap this with their own serializer
     @SuppressWarnings("unchecked")
     Serializer<T> serializer = (Serializer<T>) Serializers.byteArray();
 
@@ -89,26 +84,24 @@ public class EmbeddedQueueBroker implements QueueBroker {
   }
 
   @Override
-  public Topic getTopic(String name, TopicConfig config) {
-    return topics.computeIfAbsent(name, k -> new TopicImpl(name, config));
+  public Category getOrCreateCategory(String name, CategoryConfig config) {
+    return categories.computeIfAbsent(name, k -> new CategoryImpl(name, config));
   }
 
   @Override
-  public CompletableFuture<Void> deleteTopic(String name) {
+  public CompletableFuture<Void> deleteCategory(String name) {
     return CompletableFuture.runAsync(() -> {
-      TopicImpl topic = topics.remove(name);
-      if (topic != null) {
-        topic.shutdown();
-
-        // Remove consumer groups for this topic
+      CategoryImpl category = categories.remove(name);
+      if (category != null) {
+        category.shutdown();
         consumerGroups.remove(name);
       }
     });
   }
 
   @Override
-  public String[] listTopics() {
-    return topics.keySet().toArray(new String[0]);
+  public String[] listCategories() {
+    return categories.keySet().toArray(new String[0]);
   }
 
   @Override
@@ -116,9 +109,14 @@ public class EmbeddedQueueBroker implements QueueBroker {
     return CompletableFuture.runAsync(() -> {
       shutdown = true;
 
-      // Shutdown all topics
-      for (TopicImpl topic : topics.values()) {
-        topic.shutdown();
+      for (CategoryImpl category : categories.values()) {
+        category.shutdown();
+      }
+
+      for (Map<String, ConsumerGroup> groups : consumerGroups.values()) {
+        for (ConsumerGroup cg : groups.values()) {
+          cg.shutdown();
+        }
       }
 
       // Shutdown maintenance
@@ -131,118 +129,110 @@ public class EmbeddedQueueBroker implements QueueBroker {
     });
   }
 
-  // ========================================================================
-  // Internal methods used by producers and consumers
-  // ========================================================================
-
-  /**
-   * Internal helper to get TopicImpl (with full implementation)
-   */
-  private TopicImpl getTopicImpl(String name) {
-    Topic topic = getTopic(name, TopicConfig.defaults());
-    return (TopicImpl) topic;
+  private CategoryImpl getOrCreateCategoryImpl(String name) {
+    Category category = getOrCreateCategory(name, CategoryConfig.defaults());
+    return (CategoryImpl) category;
   }
 
   /**
-   * Publish a message (called by producer)
+   * Publish a message
    */
-  public PublishResult publish(String topicName, byte[] payload, MessageMetadata metadata) {
-    // Get or create topic
-    TopicImpl topic = getTopicImpl(topicName);
+  public PublishResult publish(String categoryName, byte[] payload, MessageInput input) {
+    // Get or create a category
+    CategoryImpl category = getOrCreateCategoryImpl(categoryName);
 
-    // Append message
-    long offset = topic.append(payload, metadata);
+    // Append message assigning queue, offset, and generate message ID
+    AppendResult result = category.append(payload, input);
 
-    // Return result
     return new PublishResult(
-        metadata.id(),
-        topicName,
-        metadata.partition(),
-        offset,
+        result.messageId(),
+        categoryName,
+        result.queueId(),
+        result.offset(),
         Instant.now()
     );
   }
 
   /**
-   * Register a consumer (called when consumer subscribes)
+   * Register a consumer
    */
   public void registerConsumer(
       String groupId,
       String consumerId,
-      String topicName,
+      String categoryName,
       ConsumerConfig config
   ) {
-    // Ensure topic exists
-    TopicImpl topic = getTopicImpl(topicName);
+    // Ensure a category exists
+    CategoryImpl category = getOrCreateCategoryImpl(categoryName);
 
-    // Get or create consumer group
+    // Get or create a consumer group
     ConsumerGroup group = consumerGroups
-        .computeIfAbsent(topicName, k -> new ConcurrentHashMap<>())
-        .computeIfAbsent(groupId, k -> new ConsumerGroup(groupId, topicName));
+        .computeIfAbsent(categoryName, _ -> new ConcurrentHashMap<>())
+        .computeIfAbsent(groupId, _ -> new ConsumerGroup(groupId, categoryName));
 
     // Register consumer
-    group.registerConsumer(consumerId, config, topic.partitionCount());
+    group.registerConsumer(consumerId, config, category.queueCount());
   }
 
   /**
    * Unregister a consumer
    */
   public void unregisterConsumer(String groupId, String consumerId, String topicName) {
-    Map<String, ConsumerGroup> topicGroups = consumerGroups.get(topicName);
-    if (topicGroups != null) {
-      ConsumerGroup group = topicGroups.get(groupId);
+    Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(topicName);
+    if (categoryGroups != null) {
+      ConsumerGroup group = categoryGroups.get(groupId);
       if (group != null) {
-        TopicImpl topic = topics.get(topicName);
-        if (topic != null) {
-          group.unregisterConsumer(consumerId, topic.partitionCount());
+        CategoryImpl category = categories.get(topicName);
+        if (category != null) {
+          group.unregisterConsumer(consumerId, category.queueCount());
         }
       }
     }
   }
 
   /**
-   * Get partitions assigned to a consumer
+   * Get queues assigned to a consumer
    */
-  public List<Integer> getAssignedPartitions(String groupId, String consumerId, String topicName) {
-    Map<String, ConsumerGroup> topicGroups = consumerGroups.get(topicName);
-    if (topicGroups == null) {
+  public List<Integer> getAssignedQueues(String groupId, String consumerId, String categoryName) {
+    Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(categoryName);
+    if (categoryGroups == null) {
       return Collections.emptyList();
     }
 
-    ConsumerGroup group = topicGroups.get(groupId);
+    ConsumerGroup group = categoryGroups.get(groupId);
     if (group == null) {
       return Collections.emptyList();
     }
 
-    return group.getAssignedPartitions(consumerId);
+    return group.getAssignedQueues(consumerId);
   }
 
   /**
-   * Fetch messages from a partition (called by consumer)
+   * Fetch messages from a queue
    */
   public List<StoredMessage> fetchMessages(
-      String topicName,
-      int partition,
+      String categoryName,
+      int queue,
       long fromOffset,
       int maxMessages
   ) {
-    TopicImpl topic = topics.get(topicName);
+    CategoryImpl topic = categories.get(categoryName);
     if (topic == null) {
       return Collections.emptyList();
     }
 
-    return topic.read(partition, fromOffset, maxMessages);
+    return topic.read(queue, fromOffset, maxMessages);
   }
 
   /**
    * Commit an offset
    */
-  public void commitOffset(String groupId, String topicName, int partition, long offset) {
-    Map<String, ConsumerGroup> topicGroups = consumerGroups.get(topicName);
-    if (topicGroups != null) {
-      ConsumerGroup group = topicGroups.get(groupId);
+  public void commitOffset(String groupId, String categoryName, int queue, long offset) {
+    Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(categoryName);
+    if (categoryGroups != null) {
+      ConsumerGroup group = categoryGroups.get(groupId);
       if (group != null) {
-        group.commitOffset(partition, offset);
+        group.commitOffset(queue, offset);
       }
     }
   }
@@ -250,18 +240,18 @@ public class EmbeddedQueueBroker implements QueueBroker {
   /**
    * Get committed offset
    */
-  public long getCommittedOffset(String groupId, String topicName, int partition) {
-    Map<String, ConsumerGroup> topicGroups = consumerGroups.get(topicName);
-    if (topicGroups == null) {
+  public long getCommittedOffset(String groupId, String categoryName, int queue) {
+    Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(categoryName);
+    if (categoryGroups == null) {
       return 0L;
     }
 
-    ConsumerGroup group = topicGroups.get(groupId);
+    ConsumerGroup group = categoryGroups.get(groupId);
     if (group == null) {
       return 0L;
     }
 
-    return group.getCommittedOffset(partition);
+    return group.getCommittedOffset(queue);
   }
 
   /**
@@ -270,25 +260,25 @@ public class EmbeddedQueueBroker implements QueueBroker {
   private void runMaintenance() {
     try {
       // Check for inactive consumers
-      for (Map.Entry<String, Map<String, ConsumerGroup>> topicEntry : consumerGroups.entrySet()) {
-        String topicName = topicEntry.getKey();
-        TopicImpl topic = topics.get(topicName);
+      for (Map.Entry<String, Map<String, ConsumerGroup>> categoryEntry : consumerGroups.entrySet()) {
+        String categoryName = categoryEntry.getKey();
+        CategoryImpl category = categories.get(categoryName);
 
-        if (topic == null) {
+        if (category == null) {
           continue;
         }
 
         // Remove inactive consumers
-        for (ConsumerGroup group : topicEntry.getValue().values()) {
-          group.removeInactiveConsumers(30000, topic.partitionCount());
+        for (ConsumerGroup group : categoryEntry.getValue().values()) {
+          group.removeInactiveConsumers(30000, category.queueCount());
         }
 
         // cleanup consumed messages
         Map<String, Map<Integer, Long>> allOffsets = new HashMap<>();
-        for (Map.Entry<String, ConsumerGroup> groupEntry : topicEntry.getValue().entrySet()) {
+        for (Map.Entry<String, ConsumerGroup> groupEntry : categoryEntry.getValue().entrySet()) {
           allOffsets.put(groupEntry.getKey(), groupEntry.getValue().getAllCommittedOffsets());
         }
-        topic.cleanupConsumedMessages(allOffsets);
+        category.cleanupConsumedMessages(allOffsets);
       }
 
     } catch (Exception e) {
@@ -296,21 +286,17 @@ public class EmbeddedQueueBroker implements QueueBroker {
     }
   }
 
-  // ========================================================================
-  // Statistics and Monitoring
-  // ========================================================================
-
   /**
    * Get broker statistics
    */
   public BrokerStats getStats() {
-    Map<String, TopicStats> topicStats = new HashMap<>();
+    Map<String, CategoryStats> categoryStats = new HashMap<>();
     long totalMessages = 0;
     long totalBytes = 0;
 
-    for (Map.Entry<String, TopicImpl> entry : topics.entrySet()) {
-      TopicStats stats = entry.getValue().stats();
-      topicStats.put(entry.getKey(), stats);
+    for (Map.Entry<String, CategoryImpl> entry : categories.entrySet()) {
+      CategoryStats stats = entry.getValue().stats();
+      categoryStats.put(entry.getKey(), stats);
       totalMessages += stats.messageCount();
       totalBytes += stats.bytesIn();
     }
@@ -321,12 +307,11 @@ public class EmbeddedQueueBroker implements QueueBroker {
         .sum();
 
     return new BrokerStats(
-        topics.size(),
+        categories.size(),
         totalMessages,
         totalBytes,
         totalConsumers,
-        topicStats
+        categoryStats
     );
   }
 }
-
