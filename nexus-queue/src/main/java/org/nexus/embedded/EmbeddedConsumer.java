@@ -11,6 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.nexus.domain.ConsumerConfig;
 import org.nexus.domain.Message;
 import org.nexus.domain.StoredMessage;
@@ -20,8 +22,18 @@ import org.nexus.interfaces.MessageHandler;
 
 /**
  * Embedded consumer implementation. Polls messages from broker and dispatches to handler.
+ * <p>
+ * This implementation currently operates on {@code byte[]} payloads when used with the
+ * default {@link EmbeddedQueueBroker}, which provides a {@code byte[]} deserializer.
  */
 public class EmbeddedConsumer<T> implements MessageConsumer<T> {
+
+  private static final int DEFAULT_BATCH_SIZE = 512;
+  private static final int DEFAULT_POOL_RATE_MS = 128;
+  private static final int MAX_IN_FLIGHT_PER_QUEUE = 1024;
+  private final Map<String, Map<Integer, Long>> pendingCommits = new ConcurrentHashMap<>();
+
+  private final Map<String, Map<Integer, QueueState>> queueStates = new ConcurrentHashMap<>();
 
   private final EmbeddedQueueBroker broker;
   private final ConsumerConfig config;
@@ -29,9 +41,6 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
   // Subscriptions
   private final Map<String, MessageHandler<T>> subscriptions = new ConcurrentHashMap<>();
-
-  // Offset tracking per queue
-  private final Map<String, Map<Integer, Long>> offsets = new ConcurrentHashMap<>();
 
   // Polling control
   private final AtomicBoolean running = new AtomicBoolean(false);
@@ -42,8 +51,10 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   private final ScheduledExecutorService pollExecutor;
   private final ExecutorService handlerExecutor;
 
-  // Auto-commit tracking
-  private final ScheduledExecutorService commitExecutor;
+  // Auto-commit tracking and execution
+  private final ScheduledExecutorService commitTimerExecutor;
+  private final ExecutorService commitWorkExecutor;
+
 
   public EmbeddedConsumer(
       EmbeddedQueueBroker broker,
@@ -55,11 +66,12 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
     this.deserializer = deserializer;
 
     // Create a polling thread
-    this.pollExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-      Thread t = new Thread(r, "consumer-poll-" + config.clientId());
-      t.setDaemon(true);
-      return t;
-    });
+    this.pollExecutor = Executors.newSingleThreadScheduledExecutor(
+        r -> {
+          Thread t = new Thread(r, "consumer-poll-" + config.clientId());
+          t.setDaemon(true);
+          return t;
+        });
 
     // Create a handler thread pool
     this.handlerExecutor = Executors.newFixedThreadPool(
@@ -71,23 +83,26 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
         }
     );
 
-    // Auto-commit executor
+    // Auto-commit pools
     if (config.autoCommit()) {
-      this.commitExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
-        Thread t = new Thread(r, "consumer-commit-" + config.clientId());
-        t.setDaemon(true);
-        return t;
-      });
+      // Auto-commit timer executor (just for scheduling)
+      this.commitTimerExecutor = Executors.newSingleThreadScheduledExecutor(
+          r -> {
+            Thread t = new Thread(r, "consumer-commit-timer-" + config.clientId());
+            t.setDaemon(true);
+            return t;
+          });
 
-      // Schedule auto-commit
-      commitExecutor.scheduleAtFixedRate(
-          this::autoCommit,
-          config.autoCommitIntervalMs(),
-          config.autoCommitIntervalMs(),
-          TimeUnit.MILLISECONDS
-      );
+      // Auto-commit work executor (for actual commits)
+      this.commitWorkExecutor = Executors.newSingleThreadExecutor(
+          r -> {
+            Thread t = new Thread(r, "consumer-commit-work-" + config.clientId());
+            t.setDaemon(true);
+            return t;
+          });
     } else {
-      this.commitExecutor = null;
+      this.commitTimerExecutor = null;
+      this.commitWorkExecutor = null;
     }
   }
 
@@ -100,7 +115,6 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
   public void subscribe(String[] categories, MessageHandler<T> handler) {
     for (String category : categories) {
       subscriptions.put(category, handler);
-      offsets.putIfAbsent(category, new ConcurrentHashMap<>());
 
       // Register with broker
       broker.registerConsumer(config.consumerGroup(), config.clientId(), category, config);
@@ -110,12 +124,21 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
     if (running.compareAndSet(false, true)) {
       startPolling();
     }
+
+    // Start auto-commit timer
+    if (config.autoCommit() && commitTimerExecutor != null) {
+      commitTimerExecutor.scheduleAtFixedRate(
+          this::autoCommit,
+          config.autoCommitIntervalMs(),
+          config.autoCommitIntervalMs(),
+          TimeUnit.MILLISECONDS
+      );
+    }
   }
 
   @Override
   public void unsubscribe(String category) {
     subscriptions.remove(category);
-    offsets.remove(category);
 
     // Unregister from broker
     broker.unregisterConsumer(config.consumerGroup(), config.clientId(), category);
@@ -135,7 +158,8 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
   @Override
   public CompletableFuture<Void> commitSync() {
-    return CompletableFuture.runAsync(this::autoCommit);
+    commitPendingOffsets();
+    return CompletableFuture.completedFuture(null);
   }
 
   @Override
@@ -156,19 +180,36 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
       // Stop accepting new messages
       unsubscribeAll();
 
-      // Shutdown executors
+      // Shutdown executors first to stop processing
       pollExecutor.shutdown();
       handlerExecutor.shutdown();
-      if (commitExecutor != null) {
-        commitExecutor.shutdown();
+
+      // Wait for processing to complete
+      try {
+        pollExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        handlerExecutor.awaitTermination(5, TimeUnit.SECONDS);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        System.err.println("Interrupted during executor shutdown: " + e.getMessage());
+      }
+
+      // commit any pending offsets after all processing is done
+      commitPendingOffsets();
+
+      if (commitTimerExecutor != null) {
+        commitTimerExecutor.shutdown();
+      }
+      if (commitWorkExecutor != null) {
+        commitWorkExecutor.shutdown();
       }
 
       try {
-        // Wait for pending operations to complete
-        pollExecutor.awaitTermination(5, TimeUnit.SECONDS);
-        handlerExecutor.awaitTermination(5, TimeUnit.SECONDS);
-        if (commitExecutor != null) {
-          commitExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        // Wait for commit executors to finish
+        if (commitTimerExecutor != null) {
+          commitTimerExecutor.awaitTermination(5, TimeUnit.SECONDS);
+        }
+        if (commitWorkExecutor != null) {
+          commitWorkExecutor.awaitTermination(5, TimeUnit.SECONDS);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -185,7 +226,7 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
     pollExecutor.scheduleWithFixedDelay(
         this::pollMessages,
         0,
-        100, // Poll every 100ms
+        DEFAULT_POOL_RATE_MS,
         TimeUnit.MILLISECONDS
     );
   }
@@ -202,6 +243,9 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
       for (Map.Entry<String, MessageHandler<T>> entry : subscriptions.entrySet()) {
         String category = entry.getKey();
         MessageHandler<T> handler = entry.getValue();
+
+        // Heartbeat to keep this consumer marked as active for this category
+        broker.heartbeat(config.consumerGroup(), config.clientId(), category);
 
         // Get assigned queues
         List<Integer> queues = broker.getAssignedQueues(
@@ -224,27 +268,26 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
    * Poll messages from a specific queue
    */
   private void pollQueue(String category, int queue, MessageHandler<T> handler) {
-    // Initialize the topic in the offsets map if it doesn't exist
-    Map<Integer, Long> queueOffsets = offsets.computeIfAbsent(category,
-        _ -> new ConcurrentHashMap<>());
+    Map<Integer, QueueState> categoryStates = queueStates
+        .computeIfAbsent(category, _ -> new ConcurrentHashMap<>());
 
-    // Always get the committed offset from the broker
-    long currentOffset = getCommittedOffset(category, queue);
+    QueueState state = categoryStates.computeIfAbsent(queue, _ -> new QueueState());
 
-    // If we have a newer offset locally, use that (but log a warning)
-    Long localOffset = queueOffsets.get(queue);
-    if (localOffset != null && localOffset > currentOffset) {
-      System.err.println("WARN: Local offset (" + localOffset +
-          ") is ahead of committed offset (" + currentOffset +
-          ") for " + category + "-" + queue);
-      currentOffset = localOffset;
+    if (state.initialized.compareAndSet(false, true)) {
+      long committedOffset = getCommittedOffset(category, queue);
+      state.nextFetchOffset.set(committedOffset);
     }
 
-    // Fetch messages
+    if (state.inFlightCount.get() >= MAX_IN_FLIGHT_PER_QUEUE) {
+      return;
+    }
+
+    long fromOffset = state.nextFetchOffset.get();
+
     List<StoredMessage> messages = broker.fetchMessages(
         category,
         queue,
-        currentOffset,
+        fromOffset,
         config.maxPollRecords()
     );
 
@@ -252,42 +295,128 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
       return;
     }
 
-    // Process messages
     for (StoredMessage storedMessage : messages) {
       if (!running.get() || paused.get()) {
         break;
       }
 
-      // Skip if we've already processed this message
-      if (storedMessage.offset() < currentOffset) {
+      long messageOffset = storedMessage.offset();
+
+      if (messageOffset < fromOffset) {
         continue;
       }
 
-      // Deserialize and process
+      state.nextFetchOffset.set(messageOffset + 1);
+
       T payload = deserializer.deserialize(category, storedMessage.payload());
       Message<T> message = new Message<>(storedMessage.metadata(), payload);
 
+      state.inFlightCount.incrementAndGet();
+      state.deliveredCount.incrementAndGet();
+
+      CompletableFuture<Void> processingFuture;
       try {
-        // Process the message
-        handler.handle(message).get(30, TimeUnit.SECONDS);
-
-        // Update offset and commit
-        long newOffset = storedMessage.offset() + 1;
-        queueOffsets.put(queue, newOffset);
-
-        // synchronous for now. TODO: implement batching
-        broker.commitOffset(
-            config.consumerGroup(),
-            category,
-            queue,
-            newOffset
-        );
-
+        processingFuture = CompletableFuture
+            .supplyAsync(() -> handler.handle(message), handlerExecutor)
+            .thenCompose(f -> f);
       } catch (Exception e) {
-        System.err.println("Error handling message at offset " +
-            storedMessage.offset() + ": " + e.getMessage());
+        state.inFlightCount.decrementAndGet();
+        System.err.println("Error submitting handler for message at offset " +
+            messageOffset + ": " + e.getMessage());
         break;
       }
+
+      processingFuture.whenComplete((ignored, throwable) -> {
+        try {
+          if (throwable == null) {
+            state.handledCount.incrementAndGet();
+
+            long newOffset = messageOffset + 1;
+            if (state.processedSinceLastCommit.incrementAndGet() >= getBatchSize()) {
+              commitQueueOffset(category, queue, newOffset);
+              state.processedSinceLastCommit.set(0);
+            } else {
+              pendingCommits
+                  .computeIfAbsent(category, _ -> new ConcurrentHashMap<>())
+                  .put(queue, newOffset);
+            }
+          } else {
+            System.err.println("Error handling message at offset " +
+                messageOffset + ": " + throwable.getMessage());
+          }
+        } finally {
+          state.inFlightCount.decrementAndGet();
+        }
+      });
+    }
+  }
+
+  private void commitPendingOffsets() {
+    if (pendingCommits.isEmpty()) {
+      return;
+    }
+
+    // Make a copy to avoid holding the lock during commit
+    Map<String, Map<Integer, Long>> commitsToProcess = new HashMap<>();
+    pendingCommits.forEach((category, queues) ->
+        commitsToProcess.put(category, new HashMap<>(queues))
+    );
+
+    // Commit each offset
+    commitsToProcess.forEach((category, queues) -> {
+      queues.forEach((queue, offset) -> {
+        try {
+          broker.commitOffset(
+              config.consumerGroup(),
+              category,
+              queue,
+              offset
+          );
+        } catch (Exception e) {
+          System.err.println("Failed to commit offset for " +
+              category + "-" + queue + ": " + e.getMessage());
+        }
+      });
+    });
+
+    // Clear only the offsets we've processed
+    pendingCommits.forEach((category, queues) -> {
+      Map<Integer, Long> committed = commitsToProcess.get(category);
+      if (committed != null) {
+        committed.keySet().forEach(queues::remove);
+        if (queues.isEmpty()) {
+          pendingCommits.remove(category);
+        }
+      }
+    });
+
+    // Reset per-queue counters for auto-commit scenarios
+    //perQueueProcessedCount.clear();
+  }
+
+  /**
+   * Commit a single queue's offset immediately
+   */
+  private void commitQueueOffset(String category, int queue, long offset) {
+    try {
+      broker.commitOffset(
+          config.consumerGroup(),
+          category,
+          queue,
+          offset
+      );
+
+      // Remove from pending commits since it's now committed
+      Map<Integer, Long> categoryPending = pendingCommits.get(category);
+      if (categoryPending != null) {
+        categoryPending.remove(queue);
+        if (categoryPending.isEmpty()) {
+          pendingCommits.remove(category);
+        }
+      }
+    } catch (Exception e) {
+      System.err.println("Failed to commit offset for " +
+          category + "-" + queue + ": " + e.getMessage());
     }
   }
 
@@ -302,28 +431,24 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
    * Auto-commit offsets
    */
   private void autoCommit() {
-    if (!config.autoCommit() || offsets.isEmpty()) {
+    //System.out.println("AUTO-COMMIT CALLED at " + System.currentTimeMillis());
+    if (!config.autoCommit() || commitWorkExecutor == null) {
       return;
     }
+    //System.out.println("AUTO-COMMIT RUNNING: pendingCommits size = " + pendingCommits.size());
 
-    // Make a copy of the current offsets to avoid concurrent modification
-    Map<String, Map<Integer, Long>> offsetsCopy = new HashMap<>();
-    for (Map.Entry<String, Map<Integer, Long>> entry : offsets.entrySet()) {
-      offsetsCopy.put(entry.getKey(), new HashMap<>(entry.getValue()));
-    }
-
-    // Commit all current offsets
-    for (Map.Entry<String, Map<Integer, Long>> topicEntry : offsetsCopy.entrySet()) {
-      String topic = topicEntry.getKey();
-      for (Map.Entry<Integer, Long> partitionEntry : topicEntry.getValue().entrySet()) {
-        broker.commitOffset(
-            config.consumerGroup(),
-            topic,
-            partitionEntry.getKey(),
-            partitionEntry.getValue()
-        );
+    // Use separate work executor to avoid timer interference
+    commitWorkExecutor.submit(() -> {
+      try {
+        commitPendingOffsets();
+      } catch (Exception e) {
+        System.err.println("Auto-commit failed: " + e.getMessage());
       }
-    }
+    });
+  }
+
+  private int getBatchSize() {
+    return DEFAULT_BATCH_SIZE;
   }
 
   public ConsumerConfig getConfig() {
@@ -336,5 +461,39 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
   public boolean isPaused() {
     return paused.get();
+  }
+
+  public long getTotalDeliveredCount(String category) {
+    Map<Integer, QueueState> states = queueStates.get(category);
+    if (states == null) {
+      return 0L;
+    }
+    long total = 0L;
+    for (QueueState state : states.values()) {
+      total += state.deliveredCount.get();
+    }
+    return total;
+  }
+
+  public long getTotalHandledCount(String category) {
+    Map<Integer, QueueState> states = queueStates.get(category);
+    if (states == null) {
+      return 0L;
+    }
+    long total = 0L;
+    for (QueueState state : states.values()) {
+      total += state.handledCount.get();
+    }
+    return total;
+  }
+
+  private static class QueueState {
+
+    private final AtomicLong nextFetchOffset = new AtomicLong(0L);
+    private final AtomicBoolean initialized = new AtomicBoolean(false);
+    private final AtomicInteger inFlightCount = new AtomicInteger(0);
+    private final AtomicLong deliveredCount = new AtomicLong(0L);
+    private final AtomicLong handledCount = new AtomicLong(0L);
+    private final AtomicInteger processedSinceLastCommit = new AtomicInteger(0);
   }
 }

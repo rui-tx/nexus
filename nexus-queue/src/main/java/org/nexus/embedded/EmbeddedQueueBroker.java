@@ -32,6 +32,10 @@ import org.nexus.serialization.Serializers;
 
 /**
  * Main embedded queue broker. Coordinates categories, consumer groups, and message routing.
+ * <p>
+ * This embedded implementation currently operates on {@code byte[]} payloads via the
+ * default serializers/deserializers. Higher-level typed producers/consumers are expected
+ * to wrap this broker.
  */
 public class EmbeddedQueueBroker implements QueueBroker {
 
@@ -39,6 +43,9 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
   // Consumer groups: categoryName -> groupId -> ConsumerGroup
   private final Map<String, Map<String, ConsumerGroup>> consumerGroups = new ConcurrentHashMap<>();
+
+  private static final long MAINTENANCE_INTERVAL_MINUTES = 5L;
+  private static final long INACTIVE_CONSUMER_TIMEOUT_MS = 30_000L;
 
   // Background tasks
   private final ScheduledExecutorService maintenanceExecutor;
@@ -53,7 +60,9 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
     maintenanceExecutor.scheduleAtFixedRate(
         this::runMaintenance,
-        30, 30, TimeUnit.SECONDS
+        MAINTENANCE_INTERVAL_MINUTES,
+        MAINTENANCE_INTERVAL_MINUTES,
+        TimeUnit.MINUTES
     );
   }
 
@@ -255,6 +264,23 @@ public class EmbeddedQueueBroker implements QueueBroker {
   }
 
   /**
+   * Record a heartbeat for an active consumer.
+   */
+  public void heartbeat(String groupId, String consumerId, String categoryName) {
+    Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(categoryName);
+    if (categoryGroups == null) {
+      return;
+    }
+
+    ConsumerGroup group = categoryGroups.get(groupId);
+    if (group == null) {
+      return;
+    }
+
+    group.heartbeat(consumerId);
+  }
+
+  /**
    * Background maintenance tasks
    */
   private void runMaintenance() {
@@ -270,7 +296,7 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
         // Remove inactive consumers
         for (ConsumerGroup group : categoryEntry.getValue().values()) {
-          group.removeInactiveConsumers(30000, category.queueCount());
+          group.removeInactiveConsumers(INACTIVE_CONSUMER_TIMEOUT_MS, category.queueCount());
         }
 
         // cleanup consumed messages

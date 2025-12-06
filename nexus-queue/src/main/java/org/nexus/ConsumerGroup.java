@@ -88,9 +88,9 @@ public class ConsumerGroup {
         assignments.computeIfAbsent(consumer, _ -> new ArrayList<>()).add(queue);
       }
 
-      System.out.println("Rebalanced category '" + category + "' for group '" + groupId + "':");
-      assignments.forEach((c, queues) ->
-          System.out.println("  " + c + " -> queues " + queues));
+      //System.out.println("Rebalanced category '" + category + "' for group '" + groupId + "':");
+      //assignments.forEach((c, queues) ->
+      //    System.out.println("  " + c + " -> queues " + queues));
 
     } finally {
       rebalanceLock.writeLock().unlock();
@@ -111,7 +111,7 @@ public class ConsumerGroup {
 
       if (!toRemove.isEmpty()) {
         for (String id : toRemove) {
-          System.out.println("Removing inactive consumer: " + id);
+          //System.out.println("Removing inactive consumer: " + id);
           consumers.remove(id);
           assignments.remove(id);
         }

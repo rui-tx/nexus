@@ -12,18 +12,18 @@ public interface MessageProducer<T> {
   /**
    * Send a message to a category
    */
-  CompletableFuture<PublishResult> send(String topic, T payload);
+  CompletableFuture<PublishResult> send(String category, T payload);
 
   /**
    * Send a message with a specific key (for partitioning)
    */
-  CompletableFuture<PublishResult> send(String topic, String key, T payload);
+  CompletableFuture<PublishResult> send(String category, String key, T payload);
 
   /**
    * Send a message with custom headers
    */
   CompletableFuture<PublishResult> send(
-      String topic,
+      String category,
       String key,
       T payload,
       Map<String, String> headers

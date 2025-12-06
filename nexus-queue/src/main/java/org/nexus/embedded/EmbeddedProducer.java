@@ -10,8 +10,7 @@ import org.nexus.interfaces.MessageProducer;
 import org.nexus.interfaces.Serializer;
 
 /**
- * Embedded producer implementation. Publishes messages directly to the broker (in-memory, no
- * network).
+ * Embedded producer implementation. Publishes messages directly to the broker (in-memory).
  */
 public class EmbeddedProducer<T> implements MessageProducer<T> {
 
@@ -52,25 +51,25 @@ public class EmbeddedProducer<T> implements MessageProducer<T> {
           new IllegalStateException("Producer is closed")
       );
     }
+    try {
+      // Serialize payload
+      byte[] payloadBytes = serializer.serialize(category, payload);
 
-    return CompletableFuture.supplyAsync(() -> {
-      try {
-        // Serialize payload
-        byte[] payloadBytes = serializer.serialize(category, payload);
+      // Create message input
+      MessageInput input = new MessageInput(
+          category,
+          key,
+          headers
+      );
 
-        // Create
-        MessageInput input = new MessageInput(
-            category,
-            key,
-            headers
-        );
+      PublishResult result = broker.publish(category, payloadBytes, input);
+      return CompletableFuture.completedFuture(result);
 
-        return broker.publish(category, payloadBytes, input);
-
-      } catch (Exception e) {
-        throw new RuntimeException("Failed to publish message", e);
-      }
-    });
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(
+          new RuntimeException("Failed to publish message", e)
+      );
+    }
   }
 
   @Override

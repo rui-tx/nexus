@@ -10,17 +10,17 @@ public interface MessageConsumer<T> {
   /**
    * Subscribe to a category with a handler
    */
-  void subscribe(String topic, MessageHandler<T> handler);
+  void subscribe(String category, MessageHandler<T> handler);
 
   /**
-   * Subscribe to multiple topics
+   * Subscribe to multiple categories
    */
-  void subscribe(String[] topics, MessageHandler<T> handler);
+  void subscribe(String[] categories, MessageHandler<T> handler);
 
   /**
    * Unsubscribe from a category
    */
-  void unsubscribe(String topic);
+  void unsubscribe(String category);
 
   /**
    * Unsubscribe from all topics

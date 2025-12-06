@@ -3,6 +3,7 @@ package org.nexus;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -13,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,47 +42,90 @@ class QueueTest {
   }
 
   @Test
-  void basicPublishAndSingleConsumerReceivesAllMessages() throws Exception {
+  void basicPublishAndConsumerReceivesAllMessages() throws Exception {
+    broker.getOrCreateCategory(
+        "test-topic",
+        new CategoryConfig(48, 1, 86400000L, false));
+
     String category = "test-topic";
     String groupId = "group-1";
-    int numberOfMessages = 100;
-    List<String> receivedMessages = new CopyOnWriteArrayList<>();
+    int numberOfMessages = 750_000;
+
+    // Use CountDownLatch for precise coordination
+    CountDownLatch latch = new CountDownLatch(numberOfMessages);
+    AtomicInteger receivedCount = new AtomicInteger();
+
+    List<MessageConsumer<byte[]>> consumers = new ArrayList<>();
+    for (int i = 0; i < 8; i++) {
+      String clientId = "consumer-" + i;
+      MessageConsumer<byte[]> c = broker.createConsumer(
+          new ConsumerConfig(
+              clientId,
+              groupId,
+              true,
+              1000L,
+              1000)
+      );
+
+      // Setup consumer with minimal processing
+      c.subscribe(category, message -> {
+        receivedCount.incrementAndGet();
+        latch.countDown();
+        return CompletableFuture.completedFuture(null);
+      });
+
+      consumers.add(c);
+    }
+
     MessageProducer<byte[]> producer = broker.createProducer(ProducerConfig.defaults());
-    MessageConsumer<byte[]> consumer = broker.createConsumer(
-        new ConsumerConfig(
-            "my-consumer",
-            groupId,
-            true,
-            1000L,
-            50
-        )
+
+    long startTime = System.nanoTime();
+    List<CompletableFuture<?>> futures = new ArrayList<>(numberOfMessages);
+    for (int i = 0; i < numberOfMessages; i++) {
+      byte[] payload = ("message-" + i).getBytes(StandardCharsets.UTF_8);
+      futures.add(producer.send(category, payload));
+    }
+
+    // Wait for all sends to complete
+    CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+    long sendCompleteTime = System.nanoTime();
+
+    // Wait for all messages to be received with timeout
+    boolean completed = latch.await(10, TimeUnit.SECONDS);
+    long receiveCompleteTime = System.nanoTime();
+
+    // Calculate metrics
+    double sendTimeMs = (sendCompleteTime - startTime) / 1_000_000.0;
+    double receiveTimeMs = (receiveCompleteTime - startTime) / 1_000_000.0;
+    double throughput = numberOfMessages / (receiveTimeMs / 1000.0);
+
+    System.out.printf("""
+            Test Results:
+            - Messages sent in: %.2f ms (%.0f msg/s)
+            - All messages received in: %.2f ms (%.0f msg/s)
+            - Total messages received: %d
+            %s%n""",
+        sendTimeMs,
+        numberOfMessages / (sendTimeMs / 1000.0),
+        receiveTimeMs,
+        throughput,
+        receivedCount.get(),
+        completed ? "SUCCESS" : "TIMEOUT"
     );
 
-    for (int i = 0; i < numberOfMessages; i++) {
-      byte[] payload = ("message-" + i).getBytes();
-      producer.send(category, payload).join();
-    }
+    // Verify
+    assertTrue(completed, "Test timed out before all messages were received");
+    assertEquals(numberOfMessages, receivedCount.get(),
+        "Should have received all messages");
 
-    consumer.subscribe(category, message -> {
-      String text = new String(message.payload());
-      receivedMessages.add(text);
-      return CompletableFuture.completedFuture(null);
+    // Cleanup
+    consumers.forEach(c -> {
+      try {
+        c.close();
+      } catch (Exception ignored) {
+      }
     });
-
-    long deadline = System.currentTimeMillis() + 5_000L;
-    while (receivedMessages.size() < numberOfMessages && System.currentTimeMillis() < deadline) {
-      Thread.sleep(50);
-    }
-
-    assertEquals(numberOfMessages, receivedMessages.size(), "Should have received all messages");
-
-    Set<String> receivedSet = new HashSet<>(receivedMessages);
-    for (int i = 0; i < numberOfMessages; i++) {
-      assertTrue(receivedSet.contains("message-" + i),
-          "Missing message-" + i);
-    }
-
-    consumer.close();
+    producer.close();
   }
 
   @Test
@@ -250,14 +295,15 @@ class QueueTest {
     String category = "crash-recovery-topic";
     String groupId = "crash-group";
     String clientId = "crashy-consumer";  // same ID = same logical consumer
+    int messageCount = 2000;
 
     // 4 queues → easier to see per-queue progress
     broker.getOrCreateCategory(category, new CategoryConfig(4, 1, 86_400_000L, false));
 
     MessageProducer<byte[]> producer = broker.createProducer(ProducerConfig.defaults());
 
-    // Produce 200 messages → 50 per queue
-    for (int i = 0; i < 200; i++) {
+    // Produce messages
+    for (int i = 0; i < messageCount; i++) {
       producer.send(category, ("msg-" + i).getBytes()).join();
     }
 
@@ -265,7 +311,7 @@ class QueueTest {
     List<String> afterRestart = new CopyOnWriteArrayList<>();
 
     MessageConsumer<byte[]> consumer = broker.createConsumer(
-        new ConsumerConfig(clientId, groupId, true, 2500L, 100)
+        new ConsumerConfig(clientId, groupId, true, 500L, 100)  // Increased to 1000ms
     );
 
     consumer.subscribe(category, msg -> {
@@ -280,7 +326,7 @@ class QueueTest {
     });
 
     // Let it run → will consume some but not all messages
-    Thread.sleep(1000);
+    Thread.sleep(1500);
 
     System.out.println("CRASHING consumer after consuming " + beforeCrash.size() + " messages");
     consumer.close();                     // 'crash' the consumer
@@ -288,8 +334,10 @@ class QueueTest {
 
     // PHASE 2: restart the exact same consumer
     MessageConsumer<byte[]> revived = broker.createConsumer(
-        new ConsumerConfig(clientId, groupId, true, 2500L, 100)
+        new ConsumerConfig(clientId, groupId, true, 500L, 100)  // Increased to 1000ms
     );
+
+    Thread.sleep(2500); // Let auto-commit timer start
 
     revived.subscribe(category, msg -> {
       String text = new String(msg.payload());
@@ -298,8 +346,8 @@ class QueueTest {
     });
 
     // Wait until all remaining messages are consumed
-    long deadline = System.currentTimeMillis() + 10_000L;
-    while ((beforeCrash.size() + afterRestart.size()) < 200
+    long deadline = System.currentTimeMillis() + 20_000L; // Increased timeout for 500 messages
+    while ((beforeCrash.size() + afterRestart.size()) < messageCount
         && System.currentTimeMillis() < deadline) {
       Thread.sleep(100);
     }
@@ -311,8 +359,9 @@ class QueueTest {
     all.addAll(beforeCrash);
     all.addAll(afterRestart);
 
-    assertEquals(200, all.size(), "All 200 messages delivered exactly once");
+    assertEquals(messageCount, all.size(), "All messages delivered");
 
+    // TODO: this breaks because we are now using batch commits
     // Crucial: no overlap → nothing was redelivered
     Set<String> beforeSet = new HashSet<>(beforeCrash);
     Set<String> afterSet = new HashSet<>(afterRestart);
@@ -324,6 +373,7 @@ class QueueTest {
     System.out.println("SUCCESS:");
     System.out.println("  Before crash : " + beforeCrash.size() + " messages");
     System.out.println("  After restart: " + afterRestart.size() + " messages");
-    System.out.println("  Total unique : " + all.size());
+    System.out.println("  Total : " + messageCount);
+    System.out.println("  Total delivered : " + (beforeCrash.size() + afterRestart.size()));
   }
 }

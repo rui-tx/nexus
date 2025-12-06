@@ -59,43 +59,47 @@ public class Queue {
     if (payload == null || payload.length == 0) {
       throw new IllegalArgumentException("payload cannot be null or empty");
     }
+    lock.writeLock().lock();
+    try {
+      // Check capacity BEFORE allocating offset
+      long currentMessages = messageCount.get();
+      long currentBytes = sizeBytes.get();
 
-    // Check capacity BEFORE allocating offset
-    long currentMessages = messageCount.get();
-    long currentBytes = sizeBytes.get();
+      if (capacityConfig.wouldExceedCapacity(currentMessages, currentBytes, payload.length)) {
+        throw new QueueFullException(
+            String.format("Queue %d is full (messages: %d/%d, bytes: %d/%d)",
+                queueId, currentMessages, capacityConfig.maxMessages(),
+                currentBytes, capacityConfig.maxSizeBytes())
+        );
+      }
 
-    if (capacityConfig.wouldExceedCapacity(currentMessages, currentBytes, payload.length)) {
-      throw new QueueFullException(
-          String.format("Queue %d is full (messages: %d/%d, bytes: %d/%d)",
-              queueId, currentMessages, capacityConfig.maxMessages(),
-              currentBytes, capacityConfig.maxSizeBytes())
+      long offset = nextOffset.getAndIncrement();
+      MessageMetadata metadata = new MessageMetadata(
+          MessageId.generate(),
+          input.category(),
+          input.key(),
+          Instant.now(),
+          queueId,
+          offset,
+          input.headers()
       );
+
+      StoredMessage stored = new StoredMessage(
+          offset,
+          metadata,
+          payload,
+          metadata.timestamp()
+      );
+
+      // Store and update message metrics
+      messages.put(offset, stored);
+      sizeBytes.addAndGet(payload.length);
+      messageCount.incrementAndGet();
+
+      return metadata;
+    } finally {
+      lock.writeLock().unlock();
     }
-
-    long offset = nextOffset.getAndIncrement();
-    MessageMetadata metadata = new MessageMetadata(
-        MessageId.generate(),
-        input.category(),
-        input.key(),
-        Instant.now(),
-        queueId,
-        offset,
-        input.headers()
-    );
-
-    StoredMessage stored = new StoredMessage(
-        offset,
-        metadata,
-        payload,
-        metadata.timestamp()
-    );
-
-    // Store and update message metrics
-    messages.put(offset, stored);
-    sizeBytes.addAndGet(payload.length);
-    messageCount.incrementAndGet();
-
-    return metadata;
   }
 
   /**
