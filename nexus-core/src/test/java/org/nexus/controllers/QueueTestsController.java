@@ -22,7 +22,7 @@ public class QueueTestsController {
     this.db1 = db1;
 
     db1.update("""
-        CREATE TABLE logs (
+        CREATE TABLE IF NOT EXISTS logs (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           log TEXT NULL
         )
@@ -34,7 +34,7 @@ public class QueueTestsController {
   ) {
     return svc.createTestPkg("test-pkg")
         .thenApply(result -> {
-          System.out.println("request done");
+          //System.out.println("request done");
           return new Response<>(202, "PENDING");
         });
   }

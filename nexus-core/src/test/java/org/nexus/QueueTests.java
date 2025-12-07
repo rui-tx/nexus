@@ -34,6 +34,7 @@ class QueueTests {
     Path tempDir = Files.createTempDirectory("nexus-e2e-test-");
     Path dbFile = tempDir.resolve("test.db");
     Path migrationsDir = tempDir.resolve("migrations");
+    Path queueDataDir = tempDir.resolve("queue-data");
 
     Files.createDirectories(migrationsDir);
 
@@ -48,10 +49,12 @@ class QueueTests {
         DB1_CONNECTION_TIMEOUT=10000
         DB1_MIGRATIONS_PATH=%s
         
+        QUEUE_DATA_DIR=%s
+        
         # Server config
         BIND_ADDRESS=0.0.0.0
         SERVER_PORT=0
-        """, dbFile, migrationsDir.toAbsolutePath());
+        """, dbFile, migrationsDir.toAbsolutePath(), queueDataDir.toAbsolutePath());
 
     Files.writeString(envFile, envContent);
 
@@ -75,6 +78,44 @@ class QueueTests {
     NexusConfig.closeInstance();
   }
 
+  private static void sendTestRequests(int count) throws Exception {
+    for (int i = 0; i < count; i++) {
+      httpClient.send(
+          HttpRequest.newBuilder(URI.create(baseUrl + "/test"))
+              .GET()
+              .build(),
+          HttpResponse.BodyHandlers.ofString()
+      );
+    }
+  }
+
+  private static int getLogCount() throws Exception {
+    String body = httpClient.send(
+        HttpRequest.newBuilder(URI.create(baseUrl + "/result"))
+            .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString()
+    ).body();
+
+    return MAPPER.readTree(body)
+        .path("data")
+        .get(0)
+        .asInt();
+  }
+
+  private static int waitForLogCountAtLeast(int target, long timeoutMs) throws Exception {
+    long deadline = System.currentTimeMillis() + timeoutMs;
+    int last = -1;
+    while (System.currentTimeMillis() < deadline) {
+      last = getLogCount();
+      if (last >= target) {
+        return last;
+      }
+      Thread.sleep(200L);
+    }
+    return last;
+  }
+
   @Test
   @Order(1)
   void testSimpleQueue() throws Exception {
@@ -92,6 +133,7 @@ class QueueTests {
   }
 
   @Test
+  @Order(3)
   void testMultipleMessages() throws Exception {
 
     int numMessages = 2000;
@@ -117,5 +159,36 @@ class QueueTests {
 
     System.out.println(result);
     //assertEquals(numMessages + "", result);
+  }
+
+  @Test
+  @Order(2)
+  void testPersistentQueueCrashRecovery_endToEnd() throws Exception {
+
+    int initialCount = getLogCount();
+
+    int phase1Messages = 20;
+    sendTestRequests(phase1Messages);
+
+    int afterPhase1 = waitForLogCountAtLeast(initialCount + phase1Messages, 15_000L);
+    assertEquals(initialCount + phase1Messages, afterPhase1,
+        "All phase 1 messages should be processed before restart");
+
+    // Give the consumer time to auto-commit offsets to disk
+    Thread.sleep(6_000L);
+
+    // Simulate broker crash and application restart
+    app.stop();
+    NexusBeanScope.close();
+    app.start(new String[]{});
+    baseUrl = app.getBaseUrl();
+
+    int phase2Messages = 20;
+    sendTestRequests(phase2Messages);
+
+    int afterPhase2 = waitForLogCountAtLeast(afterPhase1 + phase2Messages, 15_000L);
+
+    assertEquals(initialCount + phase1Messages + phase2Messages, afterPhase2,
+        "Messages after restart should be processed once without duplicates");
   }
 }

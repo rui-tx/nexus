@@ -10,8 +10,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 import org.nexus.MetricsTracker;
+import org.nexus.Protocol;
 import org.nexus.Queue;
 import org.nexus.domain.AppendResult;
+import org.nexus.domain.BinaryMessage;
 import org.nexus.domain.CategoryConfig;
 import org.nexus.domain.CategoryStats;
 import org.nexus.domain.MessageInput;
@@ -20,6 +22,7 @@ import org.nexus.domain.QueueCapacityConfig;
 import org.nexus.domain.QueueStats;
 import org.nexus.domain.StoredMessage;
 import org.nexus.interfaces.Category;
+import org.nexus.persistence.FileLog;
 
 /**
  * A category containing one or more queues. Handles message routing, partitioning, and background
@@ -30,6 +33,8 @@ public class CategoryImpl implements Category {
   private final String name;
   private final CategoryConfig config;
   private final Queue[] queues;
+
+  private final FileLog[] fileLogs;
 
   // Metrics tracking
   private final MetricsTracker metrics;
@@ -52,6 +57,15 @@ public class CategoryImpl implements Category {
     this.queues = new Queue[config.queues()];
     for (int i = 0; i < config.queues(); i++) {
       queues[i] = new Queue(i, config, capacityConfig);
+    }
+
+    if (config.persistent()) {
+      this.fileLogs = new FileLog[config.queues()];
+      for (int i = 0; i < config.queues(); i++) {
+        fileLogs[i] = FileLog.forCategoryQueue(name, i);
+      }
+    } else {
+      this.fileLogs = null;
     }
 
     this.metrics = new MetricsTracker();
@@ -88,6 +102,21 @@ public class CategoryImpl implements Category {
     // Append and update queue metrics
     MessageMetadata messageMetadata = queue.append(payload, input);
     metrics.recordMessage(payload.length);
+
+    if (fileLogs != null) {
+      BinaryMessage binaryMessage = new Protocol.MessageBuilder()
+          .messageId(messageMetadata.id().value())
+          .timestamp(messageMetadata.timestamp().toEpochMilli())
+          .command(Protocol.CMD_PUBLISH)
+          .addFlag(Protocol.FLAG_PERSISTENT)
+          .topic(messageMetadata.category())
+          .key(messageMetadata.key())
+          .headers(messageMetadata.headers())
+          .payload(payload)
+          .build();
+
+      fileLogs[queueId].append(binaryMessage);
+    }
 
     return new AppendResult(
         messageMetadata.id(),
@@ -233,6 +262,14 @@ public class CategoryImpl implements Category {
     } catch (InterruptedException e) {
       cleanupExecutor.shutdownNow();
       Thread.currentThread().interrupt();
+    }
+
+    if (fileLogs != null) {
+      for (FileLog log : fileLogs) {
+        if (log != null) {
+          log.close();
+        }
+      }
     }
   }
 }

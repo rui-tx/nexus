@@ -1,5 +1,9 @@
 package org.nexus.embedded;
 
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -12,6 +16,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.nexus.ConsumerGroup;
 import org.nexus.domain.AppendResult;
+import org.nexus.domain.BinaryMessage;
 import org.nexus.domain.BrokerStats;
 import org.nexus.domain.CategoryConfig;
 import org.nexus.domain.CategoryStats;
@@ -27,6 +32,9 @@ import org.nexus.interfaces.MessageConsumer;
 import org.nexus.interfaces.MessageProducer;
 import org.nexus.interfaces.QueueBroker;
 import org.nexus.interfaces.Serializer;
+import org.nexus.persistence.FileLog;
+import org.nexus.persistence.OffsetStore;
+import org.nexus.persistence.QueueStorage;
 import org.nexus.serialization.Deserializers;
 import org.nexus.serialization.Serializers;
 
@@ -51,6 +59,8 @@ public class EmbeddedQueueBroker implements QueueBroker {
   private final ScheduledExecutorService maintenanceExecutor;
   private volatile boolean shutdown = false;
 
+  private final OffsetStore offsetStore = new OffsetStore();
+
   public EmbeddedQueueBroker() {
     this.maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "broker-maintenance");
@@ -64,6 +74,8 @@ public class EmbeddedQueueBroker implements QueueBroker {
         MAINTENANCE_INTERVAL_MINUTES,
         TimeUnit.MINUTES
     );
+
+    recoverFromDisk();
   }
 
   @Override
@@ -199,6 +211,92 @@ public class EmbeddedQueueBroker implements QueueBroker {
     }
   }
 
+  private void recoverFromDisk() {
+    Path baseDir = QueueStorage.baseDir();
+    if (!Files.exists(baseDir) || !Files.isDirectory(baseDir)) {
+      return;
+    }
+
+    try (DirectoryStream<Path> categoryDirs = Files.newDirectoryStream(baseDir)) {
+      for (Path categoryDir : categoryDirs) {
+        if (!Files.isDirectory(categoryDir)) {
+          continue;
+        }
+
+        String categoryName = categoryDir.getFileName().toString();
+
+        int maxQueueId = -1;
+        try (DirectoryStream<Path> logFiles = Files.newDirectoryStream(categoryDir, "*.log")) {
+          for (Path logFile : logFiles) {
+            String fileName = logFile.getFileName().toString();
+            int dotIndex = fileName.indexOf('.');
+            if (dotIndex <= 0) {
+              continue;
+            }
+            String queuePart = fileName.substring(0, dotIndex);
+            try {
+              int queueId = Integer.parseInt(queuePart);
+              if (queueId > maxQueueId) {
+                maxQueueId = queueId;
+              }
+            } catch (NumberFormatException ignored) {
+            }
+          }
+        }
+
+        if (maxQueueId < 0) {
+          continue;
+        }
+
+        int queueCount = maxQueueId + 1;
+
+        CategoryImpl category = new CategoryImpl(
+            categoryName,
+            new CategoryConfig(queueCount, 1, 86_400_000L, true)
+        );
+        categories.put(categoryName, category);
+
+        try (DirectoryStream<Path> offsetFiles = Files.newDirectoryStream(categoryDir, "offsets-*.json")) {
+          for (Path offsetFile : offsetFiles) {
+            String fileName = offsetFile.getFileName().toString();
+            if (!fileName.startsWith("offsets-") || !fileName.endsWith(".json")) {
+              continue;
+            }
+            String groupId = fileName.substring("offsets-".length(), fileName.length() - ".json".length());
+            if (groupId.isEmpty()) {
+              continue;
+            }
+            Map<Integer, Long> offsets = offsetStore.load(categoryName, groupId);
+            if (offsets.isEmpty()) {
+              continue;
+            }
+            ConsumerGroup group = consumerGroups
+                .computeIfAbsent(categoryName, _ -> new ConcurrentHashMap<>())
+                .computeIfAbsent(groupId, _ -> new ConsumerGroup(groupId, categoryName));
+            for (Map.Entry<Integer, Long> entry : offsets.entrySet()) {
+              group.commitOffset(entry.getKey(), entry.getValue());
+            }
+          }
+        }
+
+        for (int queueId = 0; queueId < queueCount; queueId++) {
+          FileLog log = FileLog.forCategoryQueue(categoryName, queueId);
+          try {
+            List<BinaryMessage> messages = log.replayFromStart();
+            long offset = 0L;
+            for (BinaryMessage message : messages) {
+              category.getQueue(queueId).loadFromLog(offset++, message);
+            }
+          } finally {
+            log.close();
+          }
+        }
+      }
+    } catch (IOException e) {
+      System.err.println("Failed to recover broker state from disk: " + e.getMessage());
+    }
+  }
+
   /**
    * Get queues assigned to a consumer
    */
@@ -238,10 +336,26 @@ public class EmbeddedQueueBroker implements QueueBroker {
    */
   public void commitOffset(String groupId, String categoryName, int queue, long offset) {
     Map<String, ConsumerGroup> categoryGroups = consumerGroups.get(categoryName);
-    if (categoryGroups != null) {
-      ConsumerGroup group = categoryGroups.get(groupId);
-      if (group != null) {
-        group.commitOffset(queue, offset);
+    if (categoryGroups == null) {
+      return;
+    }
+
+    ConsumerGroup group = categoryGroups.get(groupId);
+    if (group == null) {
+      return;
+    }
+
+    // Update in-memory offsets first
+    group.commitOffset(queue, offset);
+
+    // Persist offsets only for persistent categories
+    CategoryImpl category = categories.get(categoryName);
+    if (category != null && category.config().persistent()) {
+      try {
+        offsetStore.persist(categoryName, groupId, group.getAllCommittedOffsets());
+      } catch (RuntimeException e) {
+        System.err.println("Failed to persist offsets for group '" + groupId + "' in category '"
+            + categoryName + "': " + e.getMessage());
       }
     }
   }

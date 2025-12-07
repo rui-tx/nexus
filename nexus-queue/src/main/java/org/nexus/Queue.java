@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import org.nexus.domain.BinaryMessage;
 import org.nexus.domain.CategoryConfig;
 import org.nexus.domain.MessageId;
 import org.nexus.domain.MessageInput;
@@ -97,6 +98,47 @@ public class Queue {
       messageCount.incrementAndGet();
 
       return metadata;
+    } finally {
+      lock.writeLock().unlock();
+    }
+  }
+
+  public void loadFromLog(long offset, BinaryMessage message) {
+    if (message == null || message.payload() == null || message.payload().length == 0) {
+      throw new IllegalArgumentException("message cannot be null or empty");
+    }
+    lock.writeLock().lock();
+    try {
+      MessageMetadata metadata = new MessageMetadata(
+          new MessageId(message.messageId()),
+          message.category(),
+          message.key(),
+          message.timestampAsInstant(),
+          queueId,
+          offset,
+          message.headers()
+      );
+
+      StoredMessage stored = new StoredMessage(
+          offset,
+          metadata,
+          message.payload(),
+          metadata.timestamp()
+      );
+
+      messages.put(offset, stored);
+      sizeBytes.addAndGet(message.payload().length);
+      messageCount.incrementAndGet();
+
+      long currentNext = nextOffset.get();
+      if (offset >= currentNext) {
+        nextOffset.set(offset + 1);
+      }
+
+      long currentOldest = oldestOffset.get();
+      if (messageCount.get() == 1 || offset < currentOldest) {
+        oldestOffset.set(offset);
+      }
     } finally {
       lock.writeLock().unlock();
     }

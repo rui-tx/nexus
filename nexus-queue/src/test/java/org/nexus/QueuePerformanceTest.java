@@ -1,11 +1,15 @@
 package org.nexus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -20,6 +24,8 @@ import org.nexus.domain.ProducerConfig;
 import org.nexus.embedded.EmbeddedQueueBroker;
 import org.nexus.interfaces.MessageConsumer;
 import org.nexus.interfaces.MessageProducer;
+import org.nexus.persistence.OffsetStore;
+import org.nexus.persistence.QueueStorage;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class QueuePerformanceTest {
@@ -41,13 +47,13 @@ class QueuePerformanceTest {
 
     String category = "test-topic";
     String groupId = "group-1";
-    int numberOfMessages = 100_000;
-    int queues = 64;
-    int consumersN = 32;
+    int numberOfMessages = 1000000;
+    int queues = 32;
+    int consumersN = 2;
 
     broker.getOrCreateCategory(
         "test-topic",
-        new CategoryConfig(queues, 1, 86400000L, false));
+        new CategoryConfig(queues, 1, 86400000L, true));
 
     CountDownLatch latch = new CountDownLatch(numberOfMessages);
     AtomicInteger receivedCount = new AtomicInteger();
@@ -132,6 +138,19 @@ class QueuePerformanceTest {
     assertTrue(completed, "Test timed out before all messages were received");
     assertEquals(numberOfMessages, receivedCount.get(),
         "Should have received all messages");
+
+    // Ensure offsets are flushed before checking OffsetStore
+    for (MessageConsumer<byte[]> consumer : consumers) {
+      consumer.commitSync().join();
+    }
+
+    Path logPath = QueueStorage.logPath(category, 0);
+    assertTrue(Files.exists(logPath), "Log file for queue 0 should exist for persistent category");
+    assertTrue(Files.size(logPath) > 0, "Log file for queue 0 should contain data");
+
+    OffsetStore offsetStore = new OffsetStore();
+    Map<Integer, Long> offsets = offsetStore.load(category, groupId);
+    assertFalse(offsets.isEmpty(), "Offsets file should contain at least one committed offset");
 
     consumers.forEach(c -> {
       try {

@@ -376,4 +376,76 @@ class QueueTest {
     System.out.println("  Total : " + messageCount);
     System.out.println("  Total delivered : " + (beforeCrash.size() + afterRestart.size()));
   }
+
+  @Test
+  void persistentBrokerRestart_restoresMessagesAndOffsets() throws Exception {
+
+    String category = "recovery-topic-" + System.nanoTime();
+    String groupId = "recovery-group";
+    String clientId1 = "client-1";
+    String clientId2 = "client-2";
+    int queueCount = 3;
+    int totalMessages = 120;
+
+    broker.getOrCreateCategory(category, new CategoryConfig(queueCount, 1, 86_400_000L, true));
+
+    MessageProducer<byte[]> producer = broker.createProducer(ProducerConfig.defaults());
+    for (int i = 0; i < totalMessages; i++) {
+      producer.send(category, ("msg-" + i).getBytes()).join();
+    }
+
+    List<String> phase1 = new CopyOnWriteArrayList<>();
+    List<String> phase2 = new CopyOnWriteArrayList<>();
+
+    MessageConsumer<byte[]> consumer1 = broker.createConsumer(
+        new ConsumerConfig(clientId1, groupId, true, 1000L, 100));
+
+    consumer1.subscribe(category, msg -> {
+      phase1.add(new String(msg.payload()));
+      return CompletableFuture.completedFuture(null);
+    });
+
+    int targetPhase1 = totalMessages / 2;
+    long deadline = System.currentTimeMillis() + 10_000L;
+    while (phase1.size() < targetPhase1 && System.currentTimeMillis() < deadline) {
+      Thread.sleep(100);
+    }
+
+    consumer1.commitSync().join();
+    consumer1.close().join();
+    producer.close();
+
+    broker.shutdown().get(5, TimeUnit.SECONDS);
+
+    broker = new EmbeddedQueueBroker();
+
+    MessageConsumer<byte[]> consumer2 = broker.createConsumer(
+        new ConsumerConfig(clientId2, groupId, true, 1000L, 100));
+
+    consumer2.subscribe(category, msg -> {
+      phase2.add(new String(msg.payload()));
+      return CompletableFuture.completedFuture(null);
+    });
+
+    deadline = System.currentTimeMillis() + 10_000L;
+    while ((phase1.size() + phase2.size()) < totalMessages
+        && System.currentTimeMillis() < deadline) {
+      Thread.sleep(100);
+    }
+
+    consumer2.close().join();
+
+    Set<String> allSeen = new HashSet<>();
+    allSeen.addAll(phase1);
+    allSeen.addAll(phase2);
+
+    assertEquals(totalMessages, allSeen.size(),
+        "All messages must be delivered exactly once across broker restart");
+
+    Set<String> intersection = new HashSet<>(phase1);
+    intersection.retainAll(phase2);
+
+    assertTrue(intersection.isEmpty(),
+        "No duplicates after broker restart! Duplicated messages: " + intersection);
+  }
 }
