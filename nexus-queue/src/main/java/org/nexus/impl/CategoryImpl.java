@@ -112,6 +112,8 @@ public class CategoryImpl implements Category {
           .topic(messageMetadata.category())
           .key(messageMetadata.key())
           .headers(messageMetadata.headers())
+          .queueId(queueId)
+          .offset(messageMetadata.offset())
           .payload(payload)
           .build();
 

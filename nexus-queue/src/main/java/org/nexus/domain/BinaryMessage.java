@@ -14,6 +14,8 @@ public record BinaryMessage(
     String category,
     String key,
     Map<String, String> headers,
+    int queueId,
+    long offset,
     byte[] payload
 ) {
 

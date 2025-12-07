@@ -41,25 +41,21 @@ import org.nexus.serialization.Serializers;
 /**
  * Main embedded queue broker. Coordinates categories, consumer groups, and message routing.
  * <p>
- * This embedded implementation currently operates on {@code byte[]} payloads via the
- * default serializers/deserializers. Higher-level typed producers/consumers are expected
- * to wrap this broker.
+ * This embedded implementation currently operates on {@code byte[]} payloads via the default
+ * serializers/deserializers. Higher-level typed producers/consumers are expected to wrap this
+ * broker.
  */
 public class EmbeddedQueueBroker implements QueueBroker {
 
-  private final Map<String, CategoryImpl> categories = new ConcurrentHashMap<>();
-
-  // Consumer groups: categoryName -> groupId -> ConsumerGroup
-  private final Map<String, Map<String, ConsumerGroup>> consumerGroups = new ConcurrentHashMap<>();
-
   private static final long MAINTENANCE_INTERVAL_MINUTES = 5L;
   private static final long INACTIVE_CONSUMER_TIMEOUT_MS = 30_000L;
-
+  private final Map<String, CategoryImpl> categories = new ConcurrentHashMap<>();
+  // Consumer groups: categoryName -> groupId -> ConsumerGroup
+  private final Map<String, Map<String, ConsumerGroup>> consumerGroups = new ConcurrentHashMap<>();
   // Background tasks
   private final ScheduledExecutorService maintenanceExecutor;
-  private volatile boolean shutdown = false;
-
   private final OffsetStore offsetStore = new OffsetStore();
+  private volatile boolean shutdown = false;
 
   public EmbeddedQueueBroker() {
     this.maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
@@ -256,13 +252,15 @@ public class EmbeddedQueueBroker implements QueueBroker {
         );
         categories.put(categoryName, category);
 
-        try (DirectoryStream<Path> offsetFiles = Files.newDirectoryStream(categoryDir, "offsets-*.json")) {
+        try (DirectoryStream<Path> offsetFiles = Files.newDirectoryStream(categoryDir,
+            "offsets-*.json")) {
           for (Path offsetFile : offsetFiles) {
             String fileName = offsetFile.getFileName().toString();
             if (!fileName.startsWith("offsets-") || !fileName.endsWith(".json")) {
               continue;
             }
-            String groupId = fileName.substring("offsets-".length(), fileName.length() - ".json".length());
+            String groupId = fileName.substring("offsets-".length(),
+                fileName.length() - ".json".length());
             if (groupId.isEmpty()) {
               continue;
             }
@@ -280,15 +278,13 @@ public class EmbeddedQueueBroker implements QueueBroker {
         }
 
         for (int queueId = 0; queueId < queueCount; queueId++) {
-          FileLog log = FileLog.forCategoryQueue(categoryName, queueId);
-          try {
+          try (FileLog log = FileLog.forCategoryQueue(categoryName, queueId)) {
             List<BinaryMessage> messages = log.replayFromStart();
-            long offset = 0L;
             for (BinaryMessage message : messages) {
-              category.getQueue(queueId).loadFromLog(offset++, message);
+              int msgQueueId = message.queueId();
+              long msgOffset = message.offset();
+              category.getQueue(msgQueueId).loadFromLog(msgOffset, message);
             }
-          } finally {
-            log.close();
           }
         }
       }

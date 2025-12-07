@@ -32,7 +32,7 @@ public class Protocol {
   public static final int FLAG_REQUIRES_ACK = 0x08;    // Requires explicit acknowledgment
 
   // Size constants
-  private static final int HEADER_SIZE = 2 + 1 + 1 + 4 + 16 + 8; // 32 bytes fixed header
+  private static final int HEADER_SIZE = 2 + 1 + 1 + 4 + 16 + 8 + 4 + 8; // fixed header
   private static final int MAX_TOPIC_LENGTH = 255;
   private static final int MAX_KEY_LENGTH = 255;
   private static final int MAX_HEADER_KEY_LENGTH = 255;
@@ -82,6 +82,8 @@ public class Protocol {
     buffer.putLong(message.messageId().getMostSignificantBits());
     buffer.putLong(message.messageId().getLeastSignificantBits());
     buffer.putLong(message.timestamp());
+    buffer.putInt(message.queueId());
+    buffer.putLong(message.offset());
 
     // Topic
     buffer.putShort((short) topicBytes.length);
@@ -133,6 +135,8 @@ public class Protocol {
     long leastSigBits = buffer.getLong();
     UUID messageId = new UUID(mostSigBits, leastSigBits);
     long timestamp = buffer.getLong();
+    int queueId = buffer.getInt();
+    long offset = buffer.getLong();
 
     // Topic
     short topicLength = buffer.getShort();
@@ -172,8 +176,17 @@ public class Protocol {
     buffer.get(payload);
 
     return new BinaryMessage(
-        version, command, flags, messageId, timestamp,
-        topic, key, headers, payload
+        version,
+        command,
+        flags,
+        messageId,
+        timestamp,
+        topic,
+        key,
+        headers,
+        queueId,
+        offset,
+        payload
     );
   }
 
@@ -210,6 +223,8 @@ public class Protocol {
     private String topic;
     private String key;
     private Map<String, String> headers = new HashMap<>();
+    private int queueId;
+    private long offset;
     private byte[] payload;
 
     public MessageBuilder version(byte version) {
@@ -262,6 +277,16 @@ public class Protocol {
       return this;
     }
 
+    public MessageBuilder queueId(int queueId) {
+      this.queueId = queueId;
+      return this;
+    }
+
+    public MessageBuilder offset(long offset) {
+      this.offset = offset;
+      return this;
+    }
+
     public MessageBuilder payload(byte[] payload) {
       this.payload = payload;
       return this;
@@ -269,8 +294,17 @@ public class Protocol {
 
     public BinaryMessage build() {
       return new BinaryMessage(
-          version, command, flags, messageId, timestamp,
-          topic, key, headers, payload
+          version,
+          command,
+          flags,
+          messageId,
+          timestamp,
+          topic,
+          key,
+          headers,
+          queueId,
+          offset,
+          payload
       );
     }
   }
