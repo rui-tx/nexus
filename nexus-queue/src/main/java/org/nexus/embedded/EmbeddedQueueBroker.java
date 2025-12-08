@@ -47,8 +47,8 @@ import org.nexus.serialization.Serializers;
  */
 public class EmbeddedQueueBroker implements QueueBroker {
 
-  private static final long MAINTENANCE_INTERVAL_MINUTES = 5L;
-  private static final long INACTIVE_CONSUMER_TIMEOUT_MS = 30_000L;
+  private static final long MAINTENANCE_INTERVAL_MS = 1000 * 30L;
+  private static final long INACTIVE_CONSUMER_TIMEOUT_MS = 60_000 * 5L;
   private final Map<String, CategoryImpl> categories = new ConcurrentHashMap<>();
   // Consumer groups: categoryName -> groupId -> ConsumerGroup
   private final Map<String, Map<String, ConsumerGroup>> consumerGroups = new ConcurrentHashMap<>();
@@ -66,9 +66,9 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
     maintenanceExecutor.scheduleAtFixedRate(
         this::runMaintenance,
-        MAINTENANCE_INTERVAL_MINUTES,
-        MAINTENANCE_INTERVAL_MINUTES,
-        TimeUnit.MINUTES
+        MAINTENANCE_INTERVAL_MS,
+        MAINTENANCE_INTERVAL_MS,
+        TimeUnit.MILLISECONDS
     );
 
     recoverFromDisk();
@@ -341,8 +341,28 @@ public class EmbeddedQueueBroker implements QueueBroker {
       return;
     }
 
+    if ("test-topic-perf-persistent".equals(categoryName)) {
+      long before = group.getCommittedOffset(queue);
+      System.out.println(
+          "[DEBUG] commitOffset(before) group=" + groupId +
+              " category=" + categoryName +
+              " queue=" + queue +
+              " currentOffset=" + before +
+              " newOffset=" + offset +
+              " thread=" + Thread.currentThread().getName());
+    }
+
     // Update in-memory offsets first
     group.commitOffset(queue, offset);
+
+    if ("test-topic-perf-persistent".equals(categoryName)) {
+      long after = group.getCommittedOffset(queue);
+      System.out.println(
+          "[DEBUG] commitOffset(after) group=" + groupId +
+              " category=" + categoryName +
+              " queue=" + queue +
+              " committedOffset=" + after);
+    }
 
     // Persist offsets only for persistent categories
     CategoryImpl category = categories.get(categoryName);

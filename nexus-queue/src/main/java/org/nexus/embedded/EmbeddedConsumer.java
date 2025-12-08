@@ -193,7 +193,10 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
         System.err.println("Interrupted during executor shutdown: " + e.getMessage());
       }
 
-      // commit any pending offsets after all processing is done
+      // After all processing is done, commit final offsets based on queue state
+      commitOffsetsFromQueueStates();
+
+      // Then commit any remaining pending offsets (for safety)
       commitPendingOffsets();
 
       if (commitTimerExecutor != null) {
@@ -217,6 +220,31 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
       }
     }
     return CompletableFuture.completedFuture(null);
+  }
+
+  /**
+   * Commit final offsets for all queues based on their nextFetchOffset.
+   * Called only after handler work has fully completed (e.g. during close()).
+   */
+  private void commitOffsetsFromQueueStates() {
+    queueStates.forEach((category, queues) -> {
+      queues.forEach((queueId, state) -> {
+        long offset = state.nextFetchOffset.get();
+        if (offset > 0) {
+          try {
+            broker.commitOffset(
+                config.consumerGroup(),
+                category,
+                queueId,
+                offset
+            );
+          } catch (Exception e) {
+            System.err.println("Failed to commit final offset for " +
+                category + "-" + queueId + ": " + e.getMessage());
+          }
+        }
+      });
+    });
   }
 
   /**
@@ -364,6 +392,10 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
 
     // Commit each offset
     commitsToProcess.forEach((category, queues) -> {
+      if ("test-topic-perf-persistent".equals(category)) {
+        System.out.println("[DEBUG] commitPendingOffsets category=" + category +
+            " commits=" + queues);
+      }
       queues.forEach((queue, offset) -> {
         try {
           broker.commitOffset(
@@ -377,17 +409,6 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
               category + "-" + queue + ": " + e.getMessage());
         }
       });
-    });
-
-    // Clear only the offsets we've processed
-    pendingCommits.forEach((category, queues) -> {
-      Map<Integer, Long> committed = commitsToProcess.get(category);
-      if (committed != null) {
-        committed.keySet().forEach(queues::remove);
-        if (queues.isEmpty()) {
-          pendingCommits.remove(category);
-        }
-      }
     });
 
     // Reset per-queue counters for auto-commit scenarios
@@ -405,15 +426,7 @@ public class EmbeddedConsumer<T> implements MessageConsumer<T> {
           queue,
           offset
       );
-
-      // Remove from pending commits since it's now committed
-      Map<Integer, Long> categoryPending = pendingCommits.get(category);
-      if (categoryPending != null) {
-        categoryPending.remove(queue);
-        if (categoryPending.isEmpty()) {
-          pendingCommits.remove(category);
-        }
-      }
+      // Pending commits are left intact; newer offsets will overwrite older ones
     } catch (Exception e) {
       System.err.println("Failed to commit offset for " +
           category + "-" + queue + ": " + e.getMessage());

@@ -144,7 +144,8 @@ public class ConsumerGroup {
   }
 
   public void commitOffset(int partition, long offset) {
-    committedOffsets.put(partition, offset);
+    committedOffsets.compute(partition, (p, existing) ->
+        (existing == null || offset > existing) ? offset : existing);
   }
 
   public long getCommittedOffset(int partition) {
