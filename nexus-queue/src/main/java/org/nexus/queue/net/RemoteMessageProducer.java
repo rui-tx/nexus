@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.nexus.domain.MessageId;
 import org.nexus.domain.ProducerConfig;
 import org.nexus.domain.PublishResult;
+import org.nexus.exceptions.QueueFullException;
 import org.nexus.interfaces.MessageProducer;
 import org.nexus.interfaces.Serializer;
 
@@ -99,6 +100,10 @@ public class RemoteMessageProducer<T> implements MessageProducer<T> {
       }
 
       ProduceResponse.Result result = response.results().get(0);
+      if (result.errorCode() == 2) {
+        return CompletableFuture.failedFuture(
+            new QueueFullException("Queue full for category " + category));
+      }
       if (result.errorCode() != 0) {
         return CompletableFuture.failedFuture(
             new IllegalStateException("Broker returned error code " + result.errorCode()));

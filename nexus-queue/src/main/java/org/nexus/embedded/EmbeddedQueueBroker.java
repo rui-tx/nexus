@@ -24,6 +24,7 @@ import org.nexus.domain.ConsumerConfig;
 import org.nexus.domain.MessageInput;
 import org.nexus.domain.ProducerConfig;
 import org.nexus.domain.PublishResult;
+import org.nexus.domain.QueueCapacityConfig;
 import org.nexus.domain.StoredMessage;
 import org.nexus.impl.CategoryImpl;
 import org.nexus.interfaces.Category;
@@ -57,7 +58,15 @@ public class EmbeddedQueueBroker implements QueueBroker {
   private final OffsetStore offsetStore = new OffsetStore();
   private volatile boolean shutdown = false;
 
+  private final QueueCapacityConfig capacityConfig;
+
   public EmbeddedQueueBroker() {
+    this(QueueCapacityConfig.defaultConfig());
+  }
+
+  public EmbeddedQueueBroker(QueueCapacityConfig capacityConfig) {
+    this.capacityConfig = capacityConfig;
+
     this.maintenanceExecutor = Executors.newSingleThreadScheduledExecutor(r -> {
       Thread t = new Thread(r, "broker-maintenance");
       t.setDaemon(true);
@@ -102,7 +111,7 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
   @Override
   public Category getOrCreateCategory(String name, CategoryConfig config) {
-    return categories.computeIfAbsent(name, k -> new CategoryImpl(name, config));
+    return categories.computeIfAbsent(name, k -> new CategoryImpl(name, config, capacityConfig));
   }
 
   @Override
@@ -248,7 +257,8 @@ public class EmbeddedQueueBroker implements QueueBroker {
 
         CategoryImpl category = new CategoryImpl(
             categoryName,
-            new CategoryConfig(queueCount, 1, 86_400_000L, true)
+            new CategoryConfig(queueCount, 1, 86_400_000L, true),
+            capacityConfig
         );
         categories.put(categoryName, category);
 

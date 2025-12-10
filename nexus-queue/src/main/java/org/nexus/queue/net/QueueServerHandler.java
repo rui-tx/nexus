@@ -16,6 +16,7 @@ import org.nexus.domain.MessageInput;
 import org.nexus.domain.PublishResult;
 import org.nexus.domain.StoredMessage;
 import org.nexus.embedded.EmbeddedQueueBroker;
+import org.nexus.exceptions.QueueFullException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -84,6 +85,14 @@ public class QueueServerHandler extends SimpleChannelInboundHandler<ByteBuf> {
             queueId,
             offset,
             0
+        ));
+      } catch (QueueFullException e) {
+        LOGGER.warn("Queue full for category {}", request.category());
+        results.add(new ProduceResponse.Result(
+            new java.util.UUID(0L, 0L),
+            -1,
+            -1,
+            2
         ));
       } catch (Exception e) {
         LOGGER.error("Failed to publish message for category {}", request.category(), e);

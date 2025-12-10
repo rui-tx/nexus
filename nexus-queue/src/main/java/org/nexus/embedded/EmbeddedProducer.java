@@ -6,6 +6,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.nexus.domain.MessageInput;
 import org.nexus.domain.ProducerConfig;
 import org.nexus.domain.PublishResult;
+import org.nexus.exceptions.QueueFullException;
 import org.nexus.interfaces.MessageProducer;
 import org.nexus.interfaces.Serializer;
 
@@ -65,6 +66,8 @@ public class EmbeddedProducer<T> implements MessageProducer<T> {
       PublishResult result = broker.publish(category, payloadBytes, input);
       return CompletableFuture.completedFuture(result);
 
+    } catch (QueueFullException e) {
+      return CompletableFuture.failedFuture(e);
     } catch (Exception e) {
       return CompletableFuture.failedFuture(
           new RuntimeException("Failed to publish message", e)
