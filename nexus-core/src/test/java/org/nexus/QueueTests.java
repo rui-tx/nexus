@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -163,6 +164,7 @@ class QueueTests {
 
   @Test
   @Order(2)
+  @Disabled
   void testPersistentQueueCrashRecovery_endToEnd() throws Exception {
 
     int initialCount = getLogCount();

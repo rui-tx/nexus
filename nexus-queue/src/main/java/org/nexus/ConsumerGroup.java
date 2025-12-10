@@ -61,14 +61,7 @@ public class ConsumerGroup {
   }
 
   private void scheduleRebalance(int totalQueues) {
-    if (pendingRebalance != null && !pendingRebalance.isDone()) {
-      pendingRebalance.cancel(false);
-    }
-    pendingRebalance = rebalanceScheduler.schedule(
-        () -> rebalance(totalQueues),
-        REBALANCE_DEBOUNCE_MS,
-        TimeUnit.MILLISECONDS
-    );
+    rebalance(totalQueues);
   }
 
   private void rebalance(int totalQueues) {
