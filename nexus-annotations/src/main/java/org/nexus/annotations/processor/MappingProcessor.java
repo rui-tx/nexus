@@ -205,7 +205,7 @@ public final class MappingProcessor extends AbstractProcessor {
     String sb1 = "new Route<%s>(%s, \"%s\", rc -> {\n"
         + SPACER.repeat(7)
         + (paramCode.isEmpty() ? "" : paramCode)
-        + "%s  %s controller = org.nexus.NexusBeanScope.get().get(%s.class);\n"
+        + "%s  %s controller = org.nexus.commons.NexusBeanScope.get().get(%s.class);\n"
         + SPACER.repeat(7)
         + "try {\n"
         + SPACER.repeat(8)
@@ -260,7 +260,7 @@ public final class MappingProcessor extends AbstractProcessor {
    * reflection.
    */
   private void writeServiceProvider() throws IOException {
-    String servicePath = "META-INF/services/org.nexus.RoutesResolver$RoutesProvider";
+    String servicePath = "META-INF/services/org.nexus.commons.RoutesResolver$RoutesProvider";
     FileObject fo = filer.createResource(StandardLocation.CLASS_OUTPUT, "", servicePath);
     try (PrintWriter w = new PrintWriter(fo.openWriter())) {
       w.println(MappingProcessorConstants.GENERATED_PACKAGE_FILE);

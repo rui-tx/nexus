@@ -2,7 +2,11 @@ package org.nexus.messaging;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.nexus.interfaces.MessageConsumer;
+import org.nexus.messaging.domain.MessageMetadata;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessageHandler;
+import org.nexus.messaging.interfaces.Subscription;
+import org.nexus.queue.interfaces.MessageConsumer;
 
 final class RemoteSubscription<T> implements Subscription {
 
@@ -31,10 +35,10 @@ final class RemoteSubscription<T> implements Subscription {
       return;
     }
 
-    org.nexus.interfaces.MessageHandler<byte[]> lowLevelHandler = message -> {
+    org.nexus.queue.interfaces.MessageHandler<byte[]> lowLevelHandler = message -> {
       byte[] payloadBytes = message.payload();
       T value = codec.decode(payloadBytes);
-      org.nexus.domain.MessageMetadata metadata = message.metadata();
+      org.nexus.queue.domain.MessageMetadata metadata = message.metadata();
 
       MessageMetadata highLevelMetadata = new MessageMetadata(
           metadata.category(),

@@ -1,6 +1,7 @@
 package org.nexus.messaging;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.nexus.messaging.interfaces.MessageCodec;
 
 public final class JsonMessageCodec<T> implements MessageCodec<T> {
 

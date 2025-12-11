@@ -9,9 +9,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.nexus.domain.CategoryConfig;
-import org.nexus.embedded.EmbeddedQueueBroker;
-import org.nexus.queue.net.QueueBrokerServer;
+import org.nexus.commons.enums.MessagingMode;
+import org.nexus.messaging.domain.MessagingConfig;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessagePublisher;
+import org.nexus.messaging.interfaces.MessagingClient;
+import org.nexus.messaging.interfaces.Subscription;
+import org.nexus.queue.domain.CategoryConfig;
+import org.nexus.queue.embedded.EmbeddedQueueBroker;
+import org.nexus.queue.remote.QueueBrokerServer;
 
 class RemoteMessagingClientIntegrationTest {
 

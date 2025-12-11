@@ -1,7 +1,9 @@
 package org.nexus.messaging;
 
-import org.nexus.domain.QueueCapacityConfig;
-import org.nexus.embedded.EmbeddedQueueBroker;
+import org.nexus.messaging.domain.MessagingConfig;
+import org.nexus.messaging.interfaces.MessagingClient;
+import org.nexus.queue.domain.QueueCapacityConfig;
+import org.nexus.queue.embedded.EmbeddedQueueBroker;
 
 public final class MessagingClients {
 

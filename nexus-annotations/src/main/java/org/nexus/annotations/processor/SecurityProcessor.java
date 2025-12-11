@@ -18,7 +18,7 @@ import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import org.nexus.annotations.Mapping;
 import org.nexus.annotations.Secured;
-import org.nexus.domain.SecurityRule;
+import org.nexus.commons.domain.SecurityRule;
 
 @SupportedAnnotationTypes("org.nexus.annotations.Secured")
 @SupportedSourceVersion(SourceVersion.RELEASE_25)
@@ -158,11 +158,11 @@ public final class SecurityProcessor extends AbstractProcessor {
           package %s;
           
           import java.util.*;
-          import org.nexus.PathMatcher;
-          import org.nexus.PathMatcher.CompiledPattern;
-          import org.nexus.PathMatcher.Result;
-          import org.nexus.domain.SecurityRule;
-          import org.nexus.SecurityResolver;
+          import org.nexus.commons.PathMatcher;
+          import org.nexus.commons.PathMatcher.CompiledPattern;
+          import org.nexus.commons.PathMatcher.Result;
+          import org.nexus.commons.domain.SecurityRule;
+          import org.nexus.commons.SecurityResolver;
           
           public final class %s implements SecurityResolver.SecurityRulesProvider {
             private static final Map<String, SecurityRule> exactRules = new HashMap<>();
@@ -217,7 +217,7 @@ public final class SecurityProcessor extends AbstractProcessor {
   }
 
   private void writeServiceProvider() throws IOException {
-    String servicePath = "META-INF/services/org.nexus.SecurityResolver$SecurityRulesProvider";
+    String servicePath = "META-INF/services/org.nexus.commons.SecurityResolver$SecurityRulesProvider";
     FileObject fo = processingEnv.getFiler()
         .createResource(StandardLocation.CLASS_OUTPUT, "", servicePath);
     try (PrintWriter w = new PrintWriter(fo.openWriter())) {

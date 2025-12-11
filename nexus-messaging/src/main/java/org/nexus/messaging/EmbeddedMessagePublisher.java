@@ -2,9 +2,12 @@ package org.nexus.messaging;
 
 import java.util.Map;
 import java.util.concurrent.CompletionException;
-import org.nexus.domain.ProducerConfig;
-import org.nexus.embedded.EmbeddedQueueBroker;
-import org.nexus.interfaces.MessageProducer;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessageHeaders;
+import org.nexus.messaging.interfaces.MessagePublisher;
+import org.nexus.queue.domain.ProducerConfig;
+import org.nexus.queue.embedded.EmbeddedQueueBroker;
+import org.nexus.queue.interfaces.MessageProducer;
 
 final class EmbeddedMessagePublisher<T> implements MessagePublisher<T> {
 

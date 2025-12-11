@@ -2,9 +2,12 @@ package org.nexus.messaging;
 
 import java.util.Map;
 import java.util.concurrent.CompletionException;
-import org.nexus.domain.ProducerConfig;
-import org.nexus.interfaces.MessageProducer;
-import org.nexus.queue.net.RemoteQueueBroker;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessageHeaders;
+import org.nexus.messaging.interfaces.MessagePublisher;
+import org.nexus.queue.domain.ProducerConfig;
+import org.nexus.queue.interfaces.MessageProducer;
+import org.nexus.queue.remote.RemoteQueueBroker;
 
 final class RemoteMessagePublisher<T> implements MessagePublisher<T> {
 

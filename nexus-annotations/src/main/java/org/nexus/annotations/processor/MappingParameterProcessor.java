@@ -194,7 +194,7 @@ final class MappingParameterProcessor {
   public void processRequestContextParam(VariableElement param, int paramIndex) {
     String paramType = param.asType().toString();
 
-    if (!"org.nexus.RequestContext".equals(paramType)) {
+    if (!"org.nexus.commons.RequestContext".equals(paramType)) {
       return;
     }
 

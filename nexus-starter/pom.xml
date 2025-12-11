@@ -42,30 +42,5 @@
         <groupId>org.nexus</groupId>
         <artifactId>nexus-core</artifactId>
       </dependency>
-
-      <dependency>
-        <groupId>org.nexus</groupId>
-        <artifactId>nexus-security</artifactId>
-      </dependency>
-
-      <dependency>
-        <groupId>org.nexus</groupId>
-        <artifactId>nexus-database</artifactId>
-      </dependency>
-
-      <dependency>
-        <groupId>org.postgresql</groupId>
-        <artifactId>postgresql</artifactId>
-      </dependency>
-
-      <dependency>
-        <groupId>org.xerial</groupId>
-        <artifactId>sqlite-jdbc</artifactId>
-      </dependency>
-
-      <dependency>
-        <groupId>ch.qos.logback</groupId>
-        <artifactId>logback-classic</artifactId>
-      </dependency>
     </dependencies>
 </project>

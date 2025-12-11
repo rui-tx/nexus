@@ -1,6 +1,6 @@
 package org.nexus.annotations.processor;
 
-import static org.nexus.NexusUtils.MAPPER_REFLECTION_CFG;
+import static org.nexus.commons.NexusUtils.MAPPER_REFLECTION_CFG;
 
 import java.io.IOException;
 import java.io.Writer;
@@ -138,7 +138,7 @@ final class ReflectionConfigGenerator {
       if (typeName.startsWith("java.util.concurrent.CompletableFuture<")) {
         if (!declaredType.getTypeArguments().isEmpty()) {
           TypeMirror futureTypeArg = declaredType.getTypeArguments().getFirst();
-          if (futureTypeArg.toString().startsWith("org.nexus.Response<")) {
+          if (futureTypeArg.toString().startsWith("org.nexus.commons.Response<")) {
             if ((futureTypeArg instanceof DeclaredType responseType)
                 && !responseType.getTypeArguments().isEmpty()) {
               TypeMirror responseTypeArg = responseType.getTypeArguments().getFirst();

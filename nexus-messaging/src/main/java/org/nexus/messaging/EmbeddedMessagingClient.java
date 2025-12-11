@@ -1,8 +1,13 @@
 package org.nexus.messaging;
 
-import org.nexus.domain.ConsumerConfig;
-import org.nexus.embedded.EmbeddedQueueBroker;
-import org.nexus.interfaces.MessageConsumer;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessageHandler;
+import org.nexus.messaging.interfaces.MessagePublisher;
+import org.nexus.messaging.interfaces.MessagingClient;
+import org.nexus.messaging.interfaces.Subscription;
+import org.nexus.queue.domain.ConsumerConfig;
+import org.nexus.queue.embedded.EmbeddedQueueBroker;
+import org.nexus.queue.interfaces.MessageConsumer;
 
 public final class EmbeddedMessagingClient implements MessagingClient {
 

@@ -29,6 +29,11 @@
   <dependencies>
     <dependency>
       <groupId>org.nexus</groupId>
+      <artifactId>nexus-commons</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.nexus</groupId>
       <artifactId>nexus-queue</artifactId>
     </dependency>
 

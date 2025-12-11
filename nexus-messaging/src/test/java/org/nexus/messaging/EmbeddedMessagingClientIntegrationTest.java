@@ -7,6 +7,12 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
+import org.nexus.commons.enums.MessagingMode;
+import org.nexus.messaging.domain.MessagingConfig;
+import org.nexus.messaging.interfaces.MessageCodec;
+import org.nexus.messaging.interfaces.MessagePublisher;
+import org.nexus.messaging.interfaces.MessagingClient;
+import org.nexus.messaging.interfaces.Subscription;
 
 class EmbeddedMessagingClientIntegrationTest {
 
