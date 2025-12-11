@@ -1,6 +1,6 @@
 [
   {
-    "name": "org.nexus.Response$ApiResponse",
+    "name": "org.nexus.commons.Response$ApiResponse",
     "allDeclaredConstructors": true,
     "allPublicConstructors": true,
     "allDeclaredFields": true,
@@ -11,17 +11,17 @@
     "queryAllDeclaredMethods": true
   },
   {
-    "name": "org.nexus.Response",
+    "name": "org.nexus.commons.Response",
     "allDeclaredMethods": true
   },
   {
-    "name": "org.nexus.interfaces.ProblemDetails$Single",
+    "name": "org.nexus.commons.interfaces.ProblemDetails$Single",
     "allPublicConstructors": true,
     "allPublicMethods": true,
     "allDeclaredFields": true
   },
   {
-    "name": "org.nexus.interfaces.ProblemDetails$Multiple",
+    "name": "org.nexus.commons.interfaces.ProblemDetails$Multiple",
     "allPublicConstructors": true,
     "allPublicMethods": true,
     "allDeclaredFields": true
