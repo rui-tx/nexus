@@ -53,6 +53,16 @@
             <artifactId>nexus-database</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>org.nexus</groupId>
+            <artifactId>nexus-queue</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.nexus</groupId>
+            <artifactId>nexus-messaging</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

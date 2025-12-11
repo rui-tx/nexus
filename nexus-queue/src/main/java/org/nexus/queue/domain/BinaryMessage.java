@@ -1,0 +1,40 @@
+package org.nexus.queue.domain;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+
+public record BinaryMessage(
+    byte version,
+    byte command,
+    int flags,
+    UUID messageId,
+    long timestamp,
+    String category,
+    String key,
+    Map<String, String> headers,
+    int queueId,
+    long offset,
+    byte[] payload
+) {
+
+  public BinaryMessage {
+    if (version < ProtocolVersion.VERSION_1) {
+      throw new IllegalArgumentException("Invalid protocol version: " + version);
+    }
+    if (category == null || category.isEmpty()) {
+      throw new IllegalArgumentException("Category cannot be null or empty");
+    }
+    if (payload == null) {
+      throw new IllegalArgumentException("Payload cannot be null");
+    }
+  }
+
+  public boolean hasFlag(int flag) {
+    return (flags & flag) != 0;
+  }
+
+  public Instant timestampAsInstant() {
+    return Instant.ofEpochMilli(timestamp);
+  }
+}

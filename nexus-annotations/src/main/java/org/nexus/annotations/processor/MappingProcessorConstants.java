@@ -15,14 +15,14 @@ public final class MappingProcessorConstants {
   public static final String TYPE_LONG = "java.lang.Long";
   public static final String LIST_TYPE = "java.util.List";
   public static final String COMPLETABLE_FUTURE = "java.util.concurrent.CompletableFuture";
-  public static final String RESPONSE_TYPE = "org.nexus.Response";
+  public static final String RESPONSE_TYPE = "org.nexus.commons.Response";
   public static final String ERROR_MAPPING_ONLY_ON_METHODS = "@Mapping can only be used on methods";
   public static final String ERROR_DUPLICATE_ROUTE = "Duplicate route: '%s' already defined in '%s'";
 
   public static final String GENERATED_CLASS_HEADER = """
       package %s;
       
-      import static org.nexus.NexusUtils.DF_MAPPER;
+      import static org.nexus.commons.NexusUtils.DF_MAPPER;
       
       import com.fasterxml.jackson.core.JsonProcessingException;
       import io.netty.handler.codec.http.HttpMethod;
@@ -31,14 +31,14 @@ public final class MappingProcessorConstants {
       import java.util.List;
       import java.util.Map;
       import java.util.concurrent.CompletableFuture;
-      import org.nexus.PathMatcher;
-      import org.nexus.PathMatcher.CompiledPattern;
-      import org.nexus.PathMatcher.Result;
-      import org.nexus.Route;
-      import org.nexus.RoutesResolver;
-      import org.nexus.enums.ProblemDetailsTypes;
-      import org.nexus.exceptions.ProblemDetailsException;
-      import org.nexus.interfaces.ProblemDetails;
+      import org.nexus.commons.PathMatcher;
+      import org.nexus.commons.PathMatcher.CompiledPattern;
+      import org.nexus.commons.PathMatcher.Result;
+      import org.nexus.commons.Route;
+      import org.nexus.commons.RoutesResolver;
+      import org.nexus.commons.enums.ProblemDetailsTypes;
+      import org.nexus.commons.exceptions.ProblemDetailsException;
+      import org.nexus.commons.interfaces.ProblemDetails;
       
       public final class %s implements RoutesResolver.RoutesProvider {
       

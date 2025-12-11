@@ -1,0 +1,19 @@
+package org.nexus.commons.exceptions;
+
+import org.nexus.commons.interfaces.ProblemDetails;
+
+public class ProblemDetailsException extends RuntimeException {
+
+  private final transient ProblemDetails problemDetails;
+
+  public ProblemDetailsException(ProblemDetails problemDetails) {
+    super(problemDetails instanceof ProblemDetails.Single single
+        ? single.detail()
+        : "Multiple problems occurred");
+    this.problemDetails = problemDetails;
+  }
+
+  public ProblemDetails getProblemDetails() {
+    return problemDetails;
+  }
+}

@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 public @interface Secured {
 
   String[] value() default {};
-  
+
   String[] permissions() default {};
 
   boolean permitAll() default false;
