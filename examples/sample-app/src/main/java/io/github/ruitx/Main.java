@@ -1,6 +1,6 @@
 package io.github.ruitx;
 
-import org.nexus.NexusApplication;
+import org.nexus.core.NexusApplication;
 
 public class Main extends NexusApplication {
 

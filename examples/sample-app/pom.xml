@@ -22,20 +22,20 @@
     </properties>
 
     <repositories>
-      <repository>
-        <id>github-nexus</id>
-        <!-- Encoded API read token from the project -->
-        <url>https://public:&#103;hp_kP4OdVpZnAWCBRPyg8PTjjGHTKo4zR1dWCsg@maven.pkg.github.com/rui-tx/*</url>
-        <snapshots>
-          <enabled>true</enabled>
-        </snapshots>
-      </repository>
-     <!-- local repo -->
 <!--      <repository>-->
-<!--        <id>local-nexus</id>-->
-<!--        <name>Local Nexus Repository</name>-->
-<!--        <url>file://${project.basedir}/lib/maven-repo</url>-->
+<!--        <id>github-nexus</id>-->
+<!--        &lt;!&ndash; Encoded API read token from the project &ndash;&gt;-->
+<!--        <url>https://public:&#103;hp_kP4OdVpZnAWCBRPyg8PTjjGHTKo4zR1dWCsg@maven.pkg.github.com/rui-tx/*</url>-->
+<!--        <snapshots>-->
+<!--          <enabled>true</enabled>-->
+<!--        </snapshots>-->
 <!--      </repository>-->
+     <!-- local repo -->
+      <repository>
+        <id>local-nexus</id>
+        <name>Local Nexus Repository</name>
+        <url>file://${project.basedir}/lib/maven-repo</url>
+      </repository>
     </repositories>
 
 
@@ -56,6 +56,15 @@
         <groupId>org.nexus</groupId>
         <artifactId>nexus-starter</artifactId>
       </dependency>
+      <dependency>
+        <groupId>org.nexus</groupId>
+        <artifactId>nexus-messaging</artifactId>
+      </dependency>
+      <dependency>
+          <groupId>com.sksamuel.scrimage</groupId>
+          <artifactId>scrimage-core</artifactId>
+          <version>4.3.5</version>
+      </dependency>
     </dependencies>
 
    <build>
@@ -70,13 +79,13 @@
            <proc>full</proc>
            <annotationProcessorPaths>
              <path>
-               <groupId>org.nexus</groupId>
-               <artifactId>nexus-annotations</artifactId>
-             </path>
-             <path>
                <groupId>io.avaje</groupId>
                <artifactId>avaje-inject-generator</artifactId>
                <version>12.0</version>
+             </path>
+             <path>
+               <groupId>org.nexus</groupId>
+               <artifactId>nexus-annotations</artifactId>
              </path>
            </annotationProcessorPaths>
          </configuration>
@@ -91,7 +100,7 @@
              <phase>package</phase>
              <goals><goal>shade</goal></goals>
              <configuration>
-               <finalName>sample-app</finalName>
+               <finalName>${project.artifactId}-${project.version}</finalName>
                <transformers>
                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                    <mainClass>io.github.ruitx.Main</mainClass>
@@ -159,38 +168,6 @@
                      <goal>compile-no-fork</goal>
                    </goals>
                    <id>build-native</id>
-                 </execution>
-               </executions>
-             </plugin>
-           </plugins>
-         </build>
-       </profile>
-
-       <profile>
-         <id>uber-jar</id>
-         <build>
-           <plugins>
-             <plugin>
-               <groupId>org.apache.maven.plugins</groupId>
-               <artifactId>maven-assembly-plugin</artifactId>
-               <version>3.7.1</version>
-               <configuration>
-                 <archive>
-                   <manifest>
-                     <mainClass>org.nexus.Main</mainClass>
-                   </manifest>
-                 </archive>
-                 <descriptorRefs>
-                   <descriptorRef>jar-with-dependencies</descriptorRef>
-                 </descriptorRefs>
-               </configuration>
-               <executions>
-                 <execution>
-                   <id>make-assembly</id>
-                   <phase>package</phase>
-                   <goals>
-                     <goal>single</goal>
-                   </goals>
                  </execution>
                </executions>
              </plugin>

@@ -1,2 +1,9 @@
-[
+[{
+  "name" : "io.github.ruitx.images.messaging.ImageProcessRequested",
+  "allDeclaredConstructors" : true,
+  "allDeclaredMethods" : true,
+  "allDeclaredFields" : true,
+  "queryAllDeclaredConstructors" : true,
+  "queryAllPublicConstructors" : true
+}
 ]

@@ -1,11 +1,11 @@
-package io.github.ruitx.beans;
+  package io.github.ruitx.images.beans;
 
 import io.avaje.inject.Bean;
 import io.avaje.inject.External;
 import io.avaje.inject.Factory;
 import jakarta.inject.Named;
-import org.nexus.NexusDatabase;
-import org.nexus.NexusDatabaseRegistry;
+import org.nexus.database.NexusDatabase;
+import org.nexus.database.NexusDatabaseRegistry;
 
 @Factory
 public class DatabaseFactory {
@@ -16,10 +16,5 @@ public class DatabaseFactory {
   @Named(DEFAULT_DB)
   NexusDatabase db1(@External NexusDatabaseRegistry registry) {
     return registry.get(DEFAULT_DB);
-  }
-
-  @Bean
-  NexusDatabase defaultDb(@External NexusDatabaseRegistry registry) {
-    return registry.getDefault();
   }
 }
